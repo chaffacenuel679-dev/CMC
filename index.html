@@ -113,6 +113,8 @@
   input:focus, select:focus { outline: none; border-color: var(--colline-2); box-shadow: 0 0 0 3px rgba(46,106,81,.18); }
   input[aria-invalid=true] { border-color: var(--echec); background: var(--echec-pale); }
   input:disabled, select:disabled { background: #EEF2F0; color: var(--encre-2); }
+  .aide-champ { display: block; margin-top: 5px; font-size: 13px; color: var(--echec); min-height: 0; }
+  .aide-champ:empty { display: none; }
   .mdp { position: relative; }
   .mdp input { padding-right: 86px; }
   .mdp .voir { position: absolute; right: 6px; top: 6px; height: 34px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--colline-2); font-weight: 700; font-size: 13.5px; cursor: pointer; }
@@ -214,7 +216,7 @@
   table.tableau { width: 100%; border-collapse: collapse; font-size: 14.5px; font-variant-numeric: tabular-nums; }
   table.tableau th { text-align: left; font-size: 12.5px; color: var(--encre-2); font-weight: 700; padding: 8px 10px; border-bottom: 1.5px solid var(--trait); }
   table.tableau td { padding: 10px; border-bottom: 1px solid #EDF1EF; }
-  table.tableau td.rang { width: 64px; font-weight: 700; color: var(--encre-2); }
+  table.tableau td.rang { width: 78px; white-space: nowrap; font-weight: 700; color: var(--encre-2); }
   table.tableau td.num, table.tableau th.num { text-align: right; }
   table.tableau tr.moi td { background: var(--colline-pale); font-weight: 700; }
   table.tableau tr.moi td:first-child { box-shadow: inset 4px 0 0 var(--corail); }
@@ -222,6 +224,20 @@
   .n-ko { color: var(--echec); font-weight: 700; }
   .statut-admis { color: var(--reussi); font-weight: 700; }
   .statut-non { color: var(--echec); font-weight: 700; }
+  .rang-petit { display: block; font-size: 11.5px; color: var(--encre-2); font-weight: 400; }
+  table.recap td { vertical-align: top; }
+  table.recap td.num, table.recap th.num { min-width: 82px; }
+  table.recap .c, table.recap .statut-mobile { display: none; }
+  @media (max-width: 560px) {
+    table.recap .l, table.recap .col-statut { display: none; }
+    table.recap .c, table.recap .statut-mobile { display: block; }
+    table.recap td.num, table.recap th.num { min-width: 58px; padding-left: 4px; padding-right: 4px; }
+    table.recap td.rang { width: 58px; padding-left: 6px; padding-right: 2px; }
+    table.recap { font-size: 13.5px; }
+    .statut-mobile { font-size: 11.5px; }
+  }
+  .taux-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 12px; font-size: 14px; color: var(--encre-2); }
+  .taux-puce { padding: 3px 10px; border-radius: 99px; background: var(--colline-pale); color: #23493A; font-size: 13px; }
   .bloc-classement + .bloc-classement { margin-top: 28px; }
   .bloc-classement h3 { margin: 0 0 8px; font-size: 18px; }
   .taux { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; font-size: 14px; color: var(--encre-2); }
@@ -267,14 +283,44 @@
   .puce { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 99px; font-size: 12.5px; font-weight: 700; margin-bottom: 2px; }
   .puce.cloture { background: var(--colline); color: #fff; }
   .puce.encours { background: #FFF; color: var(--colline-2); border: 1.5px solid var(--colline-3); }
-  .cols { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.15fr); width: 100%; text-align: center; font-variant-numeric: tabular-nums; }
-  .f-entetes { font-size: 12px; color: var(--encre-2); font-weight: 700; }
-  .f-entetes .cols span:last-child, .f-notes .cols span:last-child { border-left: 1.5px solid var(--seyes-fort); }
-  .f-matiere { font-weight: 700; font-size: 15px; justify-content: space-between; }
-  .f-matiere .coef { font-weight: 400; font-size: 12.5px; color: var(--encre-2); margin-left: 8px; }
-  .f-notes { font-size: 14.5px; }
-  .f-notes .vide-n { color: #A5B0AB; }
-  .f-notes .moy { font-weight: 700; }
+  /* Bulletin : tableau (ordinateur) — chaque ligne = un carreau de la feuille */
+  .tb-large { padding: 0 12px 0 calc(var(--marge) + 6px); }
+  table.bulletin { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  table.bulletin th, table.bulletin td { height: var(--pas); padding: 0 6px 5px; vertical-align: bottom; text-align: center; white-space: nowrap; }
+  table.bulletin th { font-size: 12px; color: var(--encre-2); font-weight: 700; }
+  table.bulletin .g { text-align: left; font-weight: 700; padding-left: 4px; }
+  table.bulletin td.g { font-size: 14.5px; }
+  table.bulletin .int span { display: inline-block; min-width: 36px; }
+  table.bulletin .fort { background: rgba(29,77,59,.07); font-weight: 800; }
+  table.bulletin td.fort { font-size: 15px; }
+  table.bulletin tr.total td { font-weight: 800; background: rgba(228,239,233,.9); box-shadow: inset 0 2px 0 var(--colline); }
+  table.bulletin tr.total td.fort { background: rgba(228,239,233,.9); }
+  .vide-n { color: #A5B0AB; font-weight: 400; }
+
+  /* Bulletin : téléphone — deux lignes par matière */
+  .tb-mobile { display: none; }
+  .m-entete { justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--encre-2); }
+  .m-l1 { justify-content: space-between; font-weight: 700; font-size: 15px; }
+  .m-l1 .coef { font-weight: 400; font-size: 12.5px; color: var(--encre-2); margin-left: 8px; }
+  .m-moy { font-weight: 800; font-size: 15.5px; font-variant-numeric: tabular-nums; }
+  .m-l2 { justify-content: space-between; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .m-det i { font-style: normal; font-size: 12px; color: var(--encre-2); margin-right: 5px; }
+  .m-det i + span, .m-det span + i { margin-left: 0; }
+  .m-det span { margin-right: 9px; }
+  .m-det span + i { margin-left: 4px; }
+  .m-pts { font-size: 12.5px; color: var(--encre-2); }
+  .m-total { justify-content: space-between; font-weight: 800; background: rgba(228,239,233,.9); box-shadow: inset 0 2px 0 var(--colline); }
+  @media (max-width: 719px) {
+    .tb-large { display: none; }
+    .tb-mobile { display: block; }
+  }
+
+  /* Bilan de la classe sous la moyenne */
+  .f-bilan { height: auto !important; min-height: calc(var(--pas) * 2); align-items: center !important; padding-bottom: 8px !important; }
+  .f-bilan { display: grid !important; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .f-bilan div { background: rgba(255,255,255,.92); border: 1px solid var(--trait); border-radius: 10px; padding: 7px 10px; }
+  .f-bilan span { display: block; font-size: 12px; color: var(--encre-2); line-height: 1.25; }
+  .f-bilan b { font-family: var(--titre); font-size: 17px; font-variant-numeric: tabular-nums; }
   .f-message { height: auto !important; min-height: calc(var(--pas) * 4); align-items: center !important; padding-top: 18px !important; padding-bottom: 18px !important; }
   .f-message p { margin: 0; font-size: 16px; max-width: 46ch; background: rgba(255,255,255,.88); padding: 4px 6px; border-radius: 6px; }
   .f-message p b { display: block; font-family: var(--titre); font-size: 19px; margin-bottom: 2px; }
@@ -290,6 +336,11 @@
   .tampon .sur { font-size: 12.5px; color: var(--encre-2); }
   @media (prefers-reduced-motion: no-preference) { .tampon.frappe { animation: tamponner .5s cubic-bezier(.3,1.5,.5,1) both; } }
   @keyframes tamponner { from { transform: scale(1.5) rotate(-16deg); opacity: 0; } to { transform: rotate(-5deg); opacity: 1; } }
+  .medaille { display: inline-block; margin-top: 7px; padding: 4px 11px; border-radius: 99px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .medaille.or { background: linear-gradient(135deg, #FBE7A1, #E9C45A); color: #5C4300; box-shadow: inset 0 0 0 1px #D4A93A; }
+  .medaille.argent { background: linear-gradient(135deg, #F1F3F5, #C9CFD6); color: #3B444D; box-shadow: inset 0 0 0 1px #AEB6BF; }
+  .medaille.bronze { background: linear-gradient(135deg, #F3D2B6, #D49A6A); color: #5A3112; box-shadow: inset 0 0 0 1px #BF8457; }
+  .annuel-carte .medaille { margin-top: 0; }
   .rang-bloc { background: rgba(255,255,255,.9); padding: 6px 8px; border-radius: 8px; }
   .rang-bloc .rang-grand { font-family: var(--titre); font-weight: 800; font-size: 30px; line-height: 1; }
   .rang-bloc .rang-sur { font-size: 14px; color: var(--encre-2); }
@@ -351,7 +402,7 @@
     </div>
     <div class="login-zone">
       <form class="login-carte" id="form-login" novalidate>
-        <h1>Connexion</h1>
+        <h1>👋 Connexion</h1>
         <p class="aide">Parents et élèves : utilisez les identifiants remis sur papier par l'établissement.</p>
         <div class="champ">
           <label for="l-email">Adresse e-mail</label>
@@ -411,7 +462,7 @@
 
     <main class="contenu">
       <section id="panel-inscrire" class="panneau panneau-admin actif">
-        <h2>Inscrire un élève</h2>
+        <h2>📝 Inscrire un élève</h2>
         <p class="intro">Le compte créé sert à l'élève et à ses parents. Notez l'identifiant et le mot de passe pour les remettre sur papier à la famille.</p>
         <div class="grille-form deux">
           <div class="champ"><label for="e-nom">Nom complet</label><input type="text" id="e-nom" autocomplete="off" /></div>
@@ -424,7 +475,7 @@
       </section>
 
       <section id="panel-notes" class="panneau panneau-admin">
-        <h2>Saisir les notes</h2>
+        <h2>✍️ Saisir les notes</h2>
         <p class="intro">Une case vide ne compte jamais comme zéro. Les notes d'un semestre clôturé ne peuvent plus être modifiées.</p>
         <div class="grille-form deux">
           <div class="champ"><label for="n-classe">Classe</label><select id="n-classe"><option value="">Choisir une classe</option></select></div>
@@ -440,7 +491,7 @@
       </section>
 
       <section id="panel-cloture" class="panneau panneau-admin">
-        <h2>Clôturer un semestre</h2>
+        <h2>🔒 Clôturer un semestre</h2>
         <p class="intro">La clôture calcule les moyennes et les rangs, publie le classement aux familles et verrouille les notes du semestre.</p>
         <div class="champ" style="max-width:360px"><label for="c-classe">Classe</label><select id="c-classe"><option value="">Choisir une classe</option></select></div>
         <div class="segment" role="group" aria-label="Semestre à clôturer">
@@ -451,7 +502,7 @@
         <div class="statut" id="status-cloture" role="status"></div>
         <div id="recap-cloture" style="margin-top:20px"></div>
         <div id="passage-annee" class="passage" style="display:none">
-          <h3>Passer à l'année scolaire suivante</h3>
+          <h3>🎓 Passer à l'année scolaire suivante</h3>
           <div class="champ" style="max-width:260px"><label for="nouvelle-annee">Nouvelle année scolaire</label><input type="text" id="nouvelle-annee" /></div>
           <div id="table-succession"></div>
           <button class="btn" id="btn-confirmer-passage" type="button">Confirmer le passage</button>
@@ -460,14 +511,14 @@
       </section>
 
       <section id="panel-gerer" class="panneau panneau-admin">
-        <h2>Gérer les élèves</h2>
+        <h2>👥 Gérer les élèves</h2>
         <p class="intro">Un élève retiré n'apparaît plus dans les listes, mais tout son historique de notes est conservé.</p>
         <div class="champ" style="max-width:360px"><label for="g-classe">Classe</label><select id="g-classe"><option value="">Choisir une classe</option></select></div>
         <div id="g-liste"></div>
       </section>
 
       <section id="panel-archives" class="panneau panneau-admin">
-        <h2>Archives</h2>
+        <h2>🗂️ Archives</h2>
         <p class="intro">Résultats des semestres et des années déjà clôturés, classe par classe.</p>
         <div class="grille-form deux">
           <div class="champ"><label for="ar-annee">Année scolaire</label><select id="ar-annee"></select></div>
@@ -477,13 +528,13 @@
         <div class="statut" id="status-archives" role="status"></div>
         <div id="ar-resultat" style="margin-top:18px"></div>
         <button class="btn danger" id="btn-corbeille" type="button" style="display:none;margin-top:16px">Mettre cette archive à la corbeille</button>
-        <h3>Corbeille</h3>
+        <h3>🗑️ Corbeille</h3>
         <p style="margin:-4px 0 10px;color:var(--encre-2);font-size:14px">Une archive mise à la corbeille est supprimée automatiquement après 20 jours, sauf si vous la restaurez.</p>
         <div id="corbeille-liste"></div>
       </section>
 
       <section id="panel-admin" class="panneau panneau-admin">
-        <h2>Administrateurs</h2>
+        <h2>🛡️ Administrateurs</h2>
         <p class="intro">Un administrateur peut tout faire sur le portail : inscrire, noter, clôturer, supprimer. Réservez ce compte au personnel de confiance.</p>
         <div class="grille-form deux">
           <div class="champ"><label for="a-nom">Nom complet</label><input type="text" id="a-nom" autocomplete="off" /></div>
@@ -503,7 +554,7 @@
       <p id="eleve-sous-titre"></p>
     </div>
     <div class="eleve-choix">
-      <div class="champ"><label for="e-annee-select">Année scolaire</label><select id="e-annee-select"></select></div>
+      <div class="champ"><label for="e-annee-select">📅 Année scolaire</label><select id="e-annee-select"></select></div>
       <div class="segment" role="group" aria-label="Semestre">
         <button type="button" class="active" data-esem="1">1er semestre</button>
         <button type="button" data-esem="2">2nd semestre</button>
@@ -511,7 +562,7 @@
     </div>
     <article class="feuille" id="feuille" aria-live="polite"></article>
     <section class="panneau">
-      <h2>Classement de la classe</h2>
+      <h2>🏆 Classement de la classe</h2>
       <div id="classement-eleve" style="margin-top:16px"></div>
     </section>
   </main>
@@ -605,7 +656,7 @@
   }
   function showStatus(id, msg, ok) {
     const el = $(id);
-    el.textContent = msg;
+    el.textContent = (ok ? (msg.endsWith("…") ? "⏳ " : "✅ ") : "⚠️ ") + msg;
     el.className = "statut " + (ok ? "ok" : "err");
   }
   function cacherStatus(id) { $(id).className = "statut"; $(id).textContent = ""; }
@@ -622,6 +673,41 @@
       if (e && e.code === "permission-denied") return { exists: () => false, data: () => undefined, refuse: true };
       throw e;
     }
+  }
+
+  // ================= Champs sans emoji =================
+  // Emojis, drapeaux, teintes de peau, liants invisibles (ZWJ) et sélecteurs de variante
+  const RE_EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u200D\uFE0F\u20E3]/gu;
+  const RE_NOM = /^[\p{L}\p{M}][\p{L}\p{M}'’ .\-]*[\p{L}\p{M}.]$/u;
+  const RE_EMAIL = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
+  function aideChamp(input, msg) {
+    const champ = input.closest(".champ");
+    let el = champ.querySelector(".aide-champ");
+    if (!el) { el = document.createElement("small"); el.className = "aide-champ"; el.setAttribute("role", "status"); champ.appendChild(el); }
+    el.textContent = msg || "";
+  }
+  ["e-nom", "e-email", "e-password", "a-nom", "a-email", "a-password", "l-email", "l-password"].forEach((id) => {
+    const input = $(id);
+    input.addEventListener("input", () => {
+      const propre = input.value.replace(RE_EMOJI, "");
+      if (propre !== input.value) {
+        const pos = Math.max(0, input.selectionStart - (input.value.length - propre.length));
+        input.value = propre;
+        try { input.setSelectionRange(pos, pos); } catch (e) {}
+        aideChamp(input, "🚫 Les emojis ne sont pas acceptés dans ce champ.");
+        clearTimeout(input._minuteur);
+        input._minuteur = setTimeout(() => aideChamp(input, ""), 4000); // message lisible quelques secondes
+      }
+    });
+  });
+  // Vérification finale avant création d'un compte ; renvoie un message d'erreur ou null
+  function verifierIdentite(nom, email, password) {
+    if (RE_EMOJI.test(nom + email + password)) { RE_EMOJI.lastIndex = 0; return "Les emojis ne sont pas acceptés dans le nom, l'e-mail ou le mot de passe."; }
+    RE_EMOJI.lastIndex = 0;
+    if (nom !== null && !RE_NOM.test(nom)) return "Le nom ne doit contenir que des lettres, des espaces, des apostrophes ou des tirets.";
+    if (!RE_EMAIL.test(email)) return "Adresse e-mail invalide (exemple : prenom.nom@cmc.bj, sans accent ni espace).";
+    if (password.length < 6) return "Mot de passe trop court : 6 caractères minimum.";
+    return null;
   }
 
   // ================= Année scolaire active =================
@@ -719,12 +805,12 @@
     const taux = statsDoc.taux_reussite;
     let html = "<div class='bloc-classement'><h3>" + esc(titre) + "</h3>";
     if (taux !== undefined) {
-      html += "<div class='taux'><div class='taux-barre'><span style='width:" + Math.max(0, Math.min(100, taux)) + "%'></span></div><span><b>" + taux + " %</b> de réussite</span></div>";
+      html += "<div class='taux'><div class='taux-barre'><span style='width:" + Math.max(0, Math.min(100, taux)) + "%'></span></div><span>📊 <b>" + taux + " %</b> de réussite</span></div>";
     }
     html += "<div class='tableau-scroll'><table class='tableau'><thead><tr><th>Rang</th><th>Élève</th><th class='num'>Moyenne</th>" + (avecStatut ? "<th>Statut</th>" : "") + "</tr></thead><tbody>";
     classement.forEach((x) => {
       const moi = uidMoi && x.uid === uidMoi;
-      html += "<tr" + (moi ? " class='moi'" : "") + "><td class='rang'>" + (x.rang ? rangTexte(x.rang) : "—") + "</td><td>" + esc(x.nom) +
+      html += "<tr" + (moi ? " class='moi'" : "") + "><td class='rang'>" + (x.rang ? medaille(x.rang) + rangTexte(x.rang) : "—") + "</td><td>" + esc(x.nom) +
         "</td><td class='num'><span class='" + clsNote(x.moyenne) + "'>" + fmt(x.moyenne, 3) + "</span></td>" +
         (avecStatut ? "<td>" + (x.admis ? "<span class='statut-admis'>Admis</span>" : "<span class='statut-non'>Non admis</span>") + "</td>" : "") + "</tr>";
     });
@@ -839,6 +925,8 @@
     const email = $("e-email").value.trim().toLowerCase();
     const password = $("e-password").value;
     if (!nom || !classe || !email || !password) { showStatus("status-eleve", "Remplissez les quatre champs.", false); return; }
+    const probleme = verifierIdentite(nom, email, password);
+    if (probleme) { showStatus("status-eleve", probleme, false); return; }
     try {
       const uid = await creerCompteSansDeconnecter(email, password);
       await setDoc(doc(db, "utilisateurs", uid), { nom, role: "eleve", classe, eleve_id: uid, email });
@@ -853,6 +941,8 @@
     const email = $("a-email").value.trim().toLowerCase();
     const password = $("a-password").value;
     if (!nom || !email || !password) { showStatus("status-admin", "Remplissez les trois champs.", false); return; }
+    const probleme = verifierIdentite(nom, email, password);
+    if (probleme) { showStatus("status-admin", probleme, false); return; }
     try {
       const uid = await creerCompteSansDeconnecter(email, password);
       await setDoc(doc(db, "utilisateurs", uid), { nom, role: "admin" });
@@ -877,7 +967,7 @@
   function afficherListeGerer() {
     const classe = $("g-classe").value;
     const zone = $("g-liste");
-    if (!classe || !elevesParClasse[classe]) { zone.innerHTML = classe ? "<div class='vide'>Aucun élève actif dans cette classe.</div>" : ""; return; }
+    if (!classe || !elevesParClasse[classe]) { zone.innerHTML = classe ? "<div class='vide'>📭 Aucun élève actif dans cette classe.</div>" : ""; return; }
     zone.innerHTML = elevesParClasse[classe].map((el) =>
       "<div class='liste-ligne'><div class='quoi'><b>" + esc(el.nom) + "</b></div>" +
       "<button class='btn danger petit' type='button' data-retirer='" + esc(el.uid) + "'>Retirer (abandon)</button></div>").join("");
@@ -904,6 +994,7 @@
     if (!classe || !elevesParClasse[classe]) { sel.innerHTML = "<option value=''>Choisir d'abord une classe</option>"; return; }
     sel.innerHTML = "<option value=''>Choisir un élève</option>" +
       elevesParClasse[classe].map((el) => "<option value='" + esc(el.uid) + "'>" + esc(el.nom) + "</option>").join("");
+    chargerGrille();
   });
   $("n-eleve").addEventListener("change", async (e) => { eleveSelectionne = e.target.value || null; cacherStatus("status-note"); await chargerGrille(); });
   document.querySelectorAll("[data-sem]").forEach((btn) => {
@@ -922,19 +1013,37 @@
     const classe = $("n-classe").value;
     const jeton = ++jetonGrille;
     $("btn-save-grille").disabled = true;
-    if (!eleveSelectionne || !classe) { container.innerHTML = ""; return; }
+    const refusS2 = "<div class='alerte'>🔒 <b>Accès refusé.</b> Le 1er semestre de " + esc(classe) + " n'est pas encore clôturé : la saisie du 2nd semestre s'ouvrira après sa clôture (menu « Clôturer un semestre »).</div>";
+    if (!classe) { container.innerHTML = ""; return; }
+    if (!eleveSelectionne) {
+      // Refus immédiat dès le clic sur « 2nd semestre », même avant d'avoir choisi un élève
+      container.innerHTML = "";
+      if (semestreActif === 2) {
+        const st = await lire(doc(db, "statistiques_classe", idStats(classe, 1)));
+        if (jeton === jetonGrille && !st.exists()) container.innerHTML = refusS2;
+      }
+      return;
+    }
     const matieres = matieresAcademiques(classe);
     if (matieres.length === 0) { container.innerHTML = "<div class='alerte'>Barème non défini pour « " + esc(classe) + " ».</div>"; return; }
     container.innerHTML = "<div class='squelette'><span></span><span></span><span></span></div>";
     let data;
-    try { const snap = await getDoc(doc(db, "bulletins", idBulletin(eleveSelectionne, semestreActif))); data = snap.exists() ? snap.data() : {}; }
+    try {
+      if (semestreActif === 2) {
+        const s1 = await getDoc(doc(db, "bulletins", idBulletin(eleveSelectionne, 1)));
+        if (jeton !== jetonGrille) return;
+        if (!(s1.exists() && s1.data().cloture === true)) { container.innerHTML = refusS2; return; }
+      }
+      const snap = await getDoc(doc(db, "bulletins", idBulletin(eleveSelectionne, semestreActif)));
+      data = snap.exists() ? snap.data() : {};
+    }
     catch (e) { if (jeton === jetonGrille) container.innerHTML = "<div class='alerte'>" + esc(messageErreur(e)) + "</div>"; return; }
     if (jeton !== jetonGrille) return; // un autre élève/semestre a été choisi entretemps
     const notes = data.notes || {};
     const cloture = data.cloture === true;
     const dis = cloture ? " disabled" : "";
-    let html = cloture ? "<div class='alerte'>Ce semestre est clôturé pour cet élève : les notes sont verrouillées.</div>" : "";
-    html += "<div class='grille-scroll'><table class='grille'><thead><tr><th>Matière</th>" + EVALS.map((ev) => "<th>" + EVAL_LABELS[ev] + "</th>").join("") + "</tr></thead><tbody>";
+    let html = cloture ? "<div class='alerte'>🔒 Ce semestre est clôturé pour cet élève : les notes sont verrouillées.</div>" : "";
+    html += "<div class='grille-scroll'><table class='grille'><thead><tr><th>Matières</th>" + EVALS.map((ev) => "<th>" + EVAL_LABELS[ev] + "</th>").join("") + "</tr></thead><tbody>";
     const bareme = BAREME[classe];
     matieres.forEach((mat, mi) => {
       html += "<tr><td>" + esc(mat) + "<small>coef. " + bareme[mat] + "</small></td>";
@@ -1035,13 +1144,13 @@
       if (item.data && item.data.cloture === true) continue; // déjà verrouillé lors d'une clôture interrompue
       await setDoc(doc(db, "bulletins", idBulletin(item.uid, 1)), {
         eleve_id: item.uid, classe, semestre: 1, annee_scolaire: ANNEE_SCOLAIRE,
-        notes: (item.data && item.data.notes) || {}, cloture: true, moyenne_generale: item.moyenne, rang: item.rang
+        notes: (item.data && item.data.notes) || {}, cloture: true, moyenne_generale: item.moyenne, rang: item.rang, effectif: eleves.length
       }, { merge: true });
     }
     const taux = tauxReussite(liste, eleves.length);
     const classement = liste.map((x) => ({ uid: x.uid, nom: x.nom, moyenne: x.moyenne, rang: x.rang }));
     await setDoc(doc(db, "statistiques_classe", idStats(classe, 1)), {
-      classe, semestre: 1, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: taux, classement, eleves_uids: liste.map((x) => x.uid)
+      classe, semestre: 1, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: taux, classement, eleves_uids: liste.map((x) => x.uid), effectif: eleves.length
     });
     $("recap-cloture").innerHTML = construireTableClassement("1er semestre, " + classe, { classement, taux_reussite: taux }, false);
     showStatus("status-cloture", "1er semestre clôturé pour " + classe + ". Le classement est visible par les familles.", true);
@@ -1081,7 +1190,7 @@
       if (!(item.d2 && item.d2.cloture === true)) {
         await setDoc(doc(db, "bulletins", idBulletin(item.uid, 2)), {
           eleve_id: item.uid, classe, semestre: 2, annee_scolaire: ANNEE_SCOLAIRE,
-          notes: (item.d2 && item.d2.notes) || {}, cloture: true, moyenne_generale: item.moyenne, rang: item.rang
+          notes: (item.d2 && item.d2.notes) || {}, cloture: true, moyenne_generale: item.moyenne, rang: item.rang, effectif: eleves.length
         });
       }
       const moyS1 = item.d1.moyenne_generale;
@@ -1093,7 +1202,7 @@
     for (const item of listeAnnuel) {
       await setDoc(doc(db, "bulletins", idBulletinAnnuel(item.uid)), {
         eleve_id: item.uid, classe, annee_scolaire: ANNEE_SCOLAIRE,
-        moyenne_annuelle: item.moyenne, rang_annuel: item.rang, admis: item.moyenne !== null && item.moyenne >= 10
+        moyenne_annuelle: item.moyenne, rang_annuel: item.rang, admis: item.moyenne !== null && item.moyenne >= 10, effectif: eleves.length
       });
     }
     const tauxS2 = tauxReussite(listeS2, eleves.length);
@@ -1102,10 +1211,10 @@
     const classementAnnuel = listeAnnuel.map((x) => ({ uid: x.uid, nom: x.nom, moyenne: x.moyenne, rang: x.rang, admis: x.moyenne !== null && x.moyenne >= 10 }));
     const uids = listeS2.map((x) => x.uid);
     await setDoc(doc(db, "statistiques_classe", idStats(classe, 2)), {
-      classe, semestre: 2, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: tauxS2, classement: classementS2, eleves_uids: uids
+      classe, semestre: 2, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: tauxS2, classement: classementS2, eleves_uids: uids, effectif: eleves.length
     });
     await setDoc(doc(db, "statistiques_classe", idStatsAnnuel(classe)), {
-      classe, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: tauxAnnuel, classement: classementAnnuel, eleves_uids: uids
+      classe, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: tauxAnnuel, classement: classementAnnuel, eleves_uids: uids, effectif: eleves.length
     });
     $("recap-cloture").innerHTML = construireTableClassement("2nd semestre, " + classe, { classement: classementS2, taux_reussite: tauxS2 }, false) +
       construireTableClassement("Résultat annuel, " + classe, { classement: classementAnnuel, taux_reussite: tauxAnnuel }, true);
@@ -1175,7 +1284,7 @@
         getDoc(doc(db, "statistiques_classe", classe + "_" + annee + "_S2")),
         getDoc(doc(db, "statistiques_classe", classe + "_" + annee + "_ANNUEL"))
       ]);
-      if (!s1.exists() && !s2.exists() && !an.exists()) { zone.innerHTML = "<div class='vide'>Aucun résultat clôturé pour " + esc(classe) + " en " + esc(annee) + ".</div>"; return; }
+      if (!s1.exists() && !s2.exists() && !an.exists()) { zone.innerHTML = "<div class='vide'>📭 Aucun résultat clôturé pour " + esc(classe) + " en " + esc(annee) + ".</div>"; return; }
       const uids = new Set();
       let html = "";
       [[s1, "1er semestre", false], [s2, "2nd semestre", false], [an, "Résultat annuel", true]].forEach(([s, titre, statut]) => {
@@ -1209,7 +1318,7 @@
 
   function afficherCorbeille(snap) {
     const zone = $("corbeille-liste");
-    if (snap.empty) { zone.innerHTML = "<div class='vide'>La corbeille est vide.</div>"; return; }
+    if (snap.empty) { zone.innerHTML = "<div class='vide'>📭 La corbeille est vide.</div>"; return; }
     const items = {};
     zone.innerHTML = snap.docs.map((d) => {
       const v = d.data(); items[d.id] = v;
@@ -1272,21 +1381,28 @@
       feuille.innerHTML = "<div class='squelette' aria-label='Chargement'><span></span><span></span><span></span><span></span></div>";
       zoneCl.innerHTML = "<div class='squelette' style='padding:0'><span></span><span></span></div>";
       try {
-        const snapS1 = await lire(doc(db, "bulletins", idBulletinPour(uid, 1, anneeAffichee)));
+        const [snapS1, snapS2, snapAn] = await Promise.all([
+          lire(doc(db, "bulletins", idBulletinPour(uid, 1, anneeAffichee))),
+          lire(doc(db, "bulletins", idBulletinPour(uid, 2, anneeAffichee))),
+          lire(doc(db, "bulletins", uid + "_" + anneeAffichee + "_ANNUEL"))
+        ]);
         if (jeton !== jetonRendu) return;
         const d1 = snapS1.exists() ? snapS1.data() : null;
-        const classeAnnee = (d1 && d1.classe) || classeActuelle;
+        const d2 = snapS2.exists() ? snapS2.data() : null;
+        const dAn = snapAn.exists() ? snapAn.data() : null;
+        // Classe de l'élève CETTE année-là (et non sa classe actuelle)
+        const classeAnnee = (d1 && d1.classe) || (d2 && d2.classe) || (dAn && dAn.classe) || classeActuelle;
         $("eleve-sous-titre").textContent = "Classe de " + classeAnnee + ", année " + anneeAffichee;
 
         let data = null, message = null;
         if (semEleve === 1) {
-          if (d1) data = d1; else message = ["Semestre non ouvert", "Aucune note n'a encore été publiée pour le 1er semestre."];
+          if (d1) data = d1; else message = ["⏳ Semestre non ouvert", "Aucune note n'a encore été publiée pour le 1er semestre."];
         } else if (!d1 || d1.cloture !== true) {
-          message = ["Semestre non ouvert", "Le second semestre n'est pas encore ouvert."];
+          message = ["⏳ Semestre non ouvert", "Le second semestre n'est pas encore ouvert."];
+        } else if (d2) {
+          data = d2;
         } else {
-          const s2 = await lire(doc(db, "bulletins", idBulletinPour(uid, 2, anneeAffichee)));
-          if (jeton !== jetonRendu) return;
-          if (s2.exists()) data = s2.data(); else message = ["Aucune note pour l'instant", "Aucune note n'a encore été publiée pour le second semestre."];
+          message = ["📭 Aucune note pour l'instant", "Aucune note n'a encore été publiée pour le second semestre."];
         }
 
         const [st1, st2, stA] = await Promise.all([
@@ -1297,73 +1413,160 @@
         if (jeton !== jetonRendu) return;
         const statsSem = semEleve === 1 ? st1 : st2;
         feuille.innerHTML = data
-          ? construireFeuille(data, classeAnnee, semEleve, statsSem.exists() ? statsSem.data() : null, semEleve === 2 && stA.exists() ? stA.data() : null, uid)
+          ? construireFeuille(data, classeAnnee, semEleve, statsSem.exists() ? statsSem.data() : null, semEleve === 2 ? dAn : null)
           : feuilleVide(semEleve, message);
 
         // Classement : onglet 1 = 1er semestre ; onglet 2 = 1er + 2nd semestre + résultat annuel
+        const refus = [st1, st2, stA].some((x) => x.refuse);
+        if (refus) console.warn("Lecture d'un classement refusée par les règles Firestore : vérifiez que les règles v3 sont publiées.");
         let html = "";
         if (st1.exists()) html += construireTableClassement("1er semestre", st1.data(), false, uid);
-        if (semEleve === 2) {
-          if (st2.exists()) html += construireTableClassement("2nd semestre", st2.data(), false, uid);
-          if (stA.exists()) html += construireTableClassement("Résultat annuel", stA.data(), true, uid);
-          if (st1.exists() && !st2.exists()) html += "<div class='vide' style='margin-top:18px'>Le classement du 2nd semestre sera publié à sa clôture.</div>";
+        if (semEleve === 2 && st1.exists()) {
+          // Onglet 2nd semestre : un seul récapitulatif, toute la classe avec S1, S2 et moyenne annuelle
+          html = construireRecap(st1.data(), st2.exists() ? st2.data() : null, stA.exists() ? stA.data() : null, uid);
+          if (!st2.exists() && !st2.refuse) html += "<div class='vide' style='margin-top:18px'>⏳ Les moyennes du 2nd semestre et de l'année seront publiées à la clôture du 2nd semestre.</div>";
         }
-        zoneCl.innerHTML = html || "<div class='vide'>Le classement sera publié à la clôture du " + (semEleve === 1 ? "1er" : "1er puis du 2nd") + " semestre.</div>";
+        if (refus) {
+          html += "<div class='alerte' style='margin-top:14px'>⚠️ Une partie du classement est momentanément indisponible. Si cela persiste, signalez-le au secrétariat du CMC.</div>";
+        }
+        zoneCl.innerHTML = html || "<div class='vide'>⏳ Le classement sera publié à la clôture du " + (semEleve === 1 ? "1er" : "1er puis du 2nd") + " semestre.</div>";
       } catch (e) {
         console.error(e);
         if (jeton !== jetonRendu) return;
-        feuille.innerHTML = "<div class='ligne f-message'><p><b>Affichage impossible</b>" + esc(messageErreur(e)) + " Rechargez la page.</p></div>";
+        feuille.innerHTML = "<div class='ligne f-message'><p><b>⚠️ Affichage impossible</b>" + esc(messageErreur(e)) + " Rechargez la page.</p></div>";
         zoneCl.innerHTML = "";
       }
     }
     render();
   }
 
-  function titreSemestre(sem) { return sem === 1 ? "1er semestre" : "2nd semestre"; }
+  // Récapitulatif de la classe : chaque élève avec sa moyenne (et son rang) du S1, du S2 et de l'année
+  function construireRecap(s1, s2, an, uidMoi) {
+    const eleves = new Map();
+    const cle = (x) => x.uid || x.nom;
+    const ajouter = (stats, champ) => (stats ? stats.classement || [] : []).forEach((x) => {
+      const e = eleves.get(cle(x)) || { uid: x.uid, nom: x.nom };
+      e[champ] = { moy: x.moyenne, rang: x.rang, admis: x.admis };
+      eleves.set(cle(x), e);
+    });
+    ajouter(s1, "s1"); ajouter(s2, "s2"); ajouter(an, "an");
+    const base = an ? "an" : s2 ? "s2" : "s1"; // le classement suit le résultat le plus récent publié
+    const liste = Array.from(eleves.values()).sort((a, b) => {
+      const ra = a[base] && a[base].rang, rb = b[base] && b[base].rang;
+      return (ra || 9999) - (rb || 9999) || a.nom.localeCompare(b.nom, "fr");
+    });
+    const cellule = (v) => v
+      ? "<span class='" + clsNote(v.moy) + "'>" + fmt(v.moy, 3) + "</span>" + (v.rang ? "<small class='rang-petit'>" + rangTexte(v.rang) + "</small>" : "")
+      : "<span class='vide-n'>—</span>";
+    const tx = (st, lib) => "<span class='taux-puce'>" + lib + " <b>" + (st && st.taux_reussite !== undefined ? st.taux_reussite + " %" : "—") + "</b></span>";
+    let h = "<div class='bloc-classement'><h3>Récapitulatif de la classe</h3>" +
+      "<div class='taux-ligne'>📊 Réussite : " + tx(s1, "Semestre 1") + tx(s2, "Semestre 2") + tx(an, "Année") + "</div>" +
+      "<div class='tableau-scroll'><table class='tableau recap'><thead><tr><th>Rang</th><th>Élève</th><th class='num'><span class='l'>Semestre 1</span><span class='c'>S1</span></th><th class='num'><span class='l'>Semestre 2</span><span class='c'>S2</span></th><th class='num'><span class='l'>Annuelle</span><span class='c'>Année</span></th>" + (an ? "<th class='col-statut'>Statut</th>" : "") + "</tr></thead><tbody>";
+    liste.forEach((e) => {
+      const r = e[base] && e[base].rang;
+      h += "<tr" + (uidMoi && e.uid === uidMoi ? " class='moi'" : "") + "><td class='rang'>" + (r ? medaille(r) + rangTexte(r) : "—") + "</td><td>" + esc(e.nom) + "</td>" +
+        "<td class='num'>" + cellule(e.s1) + "</td><td class='num'>" + cellule(e.s2) + "</td><td class='num'>" + cellule(e.an) +
+        (an && e.an ? "<small class='statut-mobile " + (e.an.admis ? "statut-admis'>Admis" : "statut-non'>Non admis") + "</small>" : "") + "</td>" +
+        (an ? "<td class='col-statut'>" + (e.an && e.an.admis ? "<span class='statut-admis'>Admis</span>" : "<span class='statut-non'>Non admis</span>") + "</td>" : "") + "</tr>";
+    });
+    return h + "</tbody></table></div></div>";
+  }
+
+  function titreSemestre(sem) { return sem === 1 ? "📘 1er semestre" : "📙 2nd semestre"; }
 
   function feuilleVide(sem, message) {
     return "<div class='ligne f-titre'><h2>" + titreSemestre(sem) + "</h2></div>" +
       "<div class='ligne f-message'><p><b>" + esc(message[0]) + "</b>" + esc(message[1]) + "</p></div>";
   }
 
-  function construireFeuille(data, classe, sem, stats, statsAnnuel, uid) {
-    const notes = data.notes || {};
+  function medaille(r) { return r === 1 ? "🥇 " : r === 2 ? "🥈 " : r === 3 ? "🥉 " : ""; }
+
+  // Calcule toutes les lignes du bulletin (une par matière + conduite) et les totaux
+  function lignesBulletin(classe, notes) {
     const bareme = BAREME[classe] || {};
-    const cloture = data.cloture === true;
-    let h = "<div class='ligne f-titre'><h2>" + titreSemestre(sem) + "</h2><span class='puce " + (cloture ? "cloture'>Clôturé" : "encours'>En cours") + "</span></div>";
-    h += "<div class='ligne f-entetes'><div class='cols'>" + EVALS.map((e) => "<span>" + EVAL_COURT[e] + "</span>").join("") + "<span>Moy.</span></div></div>";
-    matieresAcademiques(classe).forEach((mat) => {
+    const lignes = matieresAcademiques(classe).map((mat) => {
       const n = notes[mat] || {};
+      const interros = ["interro1", "interro2", "interro3"].map((k) => n[k]);
+      const remplies = interros.filter(present);
       const moy = moyenneMatiere(notes[mat], mat);
-      h += "<div class='ligne f-matiere'><span>" + esc(mat) + "<span class='coef'>coef. " + bareme[mat] + "</span></span></div>";
-      h += "<div class='ligne f-notes'><div class='cols'>" +
-        EVALS.map((e) => present(n[e]) ? "<span class='" + clsNote(n[e]) + "'>" + fmtNote(n[e]) + "</span>" : "<span class='vide-n'>—</span>").join("") +
-        "<span class='moy'>" + (moy !== null ? fmt(moy, 2) : "<span class='vide-n'>—</span>") + "</span></div></div>";
+      return {
+        mat, coef: bareme[mat], interros,
+        moyI: remplies.length ? remplies.reduce((a, b) => a + b, 0) / remplies.length : null,
+        d1: n.devoir1, d2: n.devoir2, moy, points: moy !== null ? moy * bareme[mat] : null
+      };
     });
     const cv = notes["Conduite"] ? notes["Conduite"].valeur : null;
-    h += "<div class='ligne f-matiere'><span>Conduite<span class='coef'>coef. " + (bareme["Conduite"] || 1) + "</span></span></div>";
-    h += "<div class='ligne f-notes'><div class='cols'><span></span><span></span><span></span><span></span><span></span><span class='moy'>" + (present(cv) ? fmtNote(cv) : "<span class='vide-n'>—</span>") + "</span></div></div>";
+    const coefC = bareme["Conduite"] || 1;
+    lignes.push({ mat: "Conduite", coef: coefC, conduite: true, moy: present(cv) ? cv : null, points: present(cv) ? cv * coefC : null });
+    const notees = lignes.filter((l) => l.moy !== null);
+    return {
+      lignes,
+      totalCoef: notees.reduce((a, l) => a + l.coef, 0),
+      totalPoints: notees.reduce((a, l) => a + l.points, 0)
+    };
+  }
 
+  const note = (v) => present(v) ? "<span class='" + clsNote(v) + "'>" + fmtNote(v) + "</span>" : "<span class='vide-n'>—</span>";
+  const neutre = (v, d) => present(v) ? fmt(v, d) : "<span class='vide-n'>—</span>";
+
+  function construireFeuille(data, classe, sem, stats, bulletinAnnuel) {
+    const cloture = data.cloture === true;
+    const { lignes, totalCoef, totalPoints } = lignesBulletin(classe, data.notes || {});
+    let h = "<div class='ligne f-titre'><h2>" + titreSemestre(sem) + "</h2><span class='puce " + (cloture ? "cloture'>🔒 Clôturé" : "encours'>✏️ En cours") + "</span></div>";
+
+    // --- Ordinateur / tablette : tableau complet ---
+    h += "<div class='tb-large'><table class='bulletin'><thead><tr><th class='g'>Matières</th><th>Coef.</th><th class='int'>Interrogations</th><th>Moy. int.</th><th>Dev. 1</th><th>Dev. 2</th><th class='fort'>Moy. /20</th><th>Points</th></tr></thead><tbody>";
+    lignes.forEach((l) => {
+      if (l.conduite) {
+        h += "<tr><td class='g'>" + esc(l.mat) + "</td><td>" + l.coef + "</td><td class='int'></td><td></td><td></td><td></td><td class='fort'>" + neutre(l.moy, 2) + "</td><td>" + neutre(l.points, 2) + "</td></tr>";
+      } else {
+        h += "<tr><td class='g'>" + esc(l.mat) + "</td><td>" + l.coef + "</td><td class='int'>" + l.interros.map(note).join("") + "</td><td>" + neutre(l.moyI, 2) +
+          "</td><td>" + note(l.d1) + "</td><td>" + note(l.d2) + "</td><td class='fort'>" + neutre(l.moy, 2) + "</td><td>" + neutre(l.points, 2) + "</td></tr>";
+      }
+    });
+    if (cloture) h += "<tr class='total'><td class='g'>Total</td><td>" + totalCoef + "</td><td colspan='5'></td><td>" + fmt(totalPoints, 2) + "</td></tr>";
+    h += "</tbody></table></div>";
+
+    // --- Téléphone : deux lignes par matière ---
+    h += "<div class='tb-mobile'><div class='ligne m-entete'><span>Matières</span><span>Moy. /20</span></div>";
+    lignes.forEach((l) => {
+      h += "<div class='ligne m-l1'><span class='m-nom'>" + esc(l.mat) + "<span class='coef'>coef. " + l.coef + "</span></span><span class='m-moy'>" + neutre(l.moy, 2) + "</span></div>";
+      h += l.conduite
+        ? "<div class='ligne m-l2'><span class='m-det'>Note de conduite</span><span class='m-pts'>" + (present(l.points) ? fmt(l.points, 2) + " pts" : "") + "</span></div>"
+        : "<div class='ligne m-l2'><span class='m-det'><i>Int.</i>" + l.interros.map(note).join("") + "<i>Dev.</i>" + note(l.d1) + note(l.d2) + "</span><span class='m-pts'>" + (present(l.points) ? fmt(l.points, 2) + " pts" : "") + "</span></div>";
+    });
+    if (cloture) h += "<div class='ligne m-total'><span>Total : " + totalCoef + " coef.</span><span>" + fmt(totalPoints, 2) + " points</span></div>";
+    h += "</div>";
+
+    // --- Moyenne, rang sur l'effectif, bilan de la classe ---
     if (cloture && present(data.moyenne_generale)) {
-      const classes = (stats && stats.classement) || [];
-      const classes2 = classes.filter((x) => x.moyenne !== null && x.moyenne !== undefined);
-      const exAequo = data.rang && classes2.filter((x) => x.rang === data.rang).length > 1;
+      const classement = (stats && stats.classement) || [];
+      const effectif = data.effectif || (stats && stats.effectif) || classement.length || null;
+      const exAequo = data.rang && classement.filter((x) => x.rang === data.rang).length > 1;
       h += "<div class='ligne f-verdict'>" +
         "<div class='tampon frappe'><small>Moyenne</small><span class='valeur " + clsNote(data.moyenne_generale) + "'>" + fmt(data.moyenne_generale, 3) + "</span><span class='sur'>sur 20</span></div>" +
-        "<div class='rang-bloc'><div class='rang-sur'>Rang</div><div class='rang-grand'>" + (data.rang ? rangTexte(data.rang) : "—") + "</div>" +
-        "<div class='rang-sur'>" + (classes2.length ? "sur " + classes2.length + " élèves" : "") + (exAequo ? ", ex aequo" : "") + "</div></div></div>";
-    } else {
-      h += "<div class='ligne f-message' style='min-height:96px'><p>La moyenne et le rang seront publiés à la clôture du semestre.</p></div>";
-    }
-    if (statsAnnuel) {
-      const moi = (statsAnnuel.classement || []).find((x) => x.uid === uid);
-      if (moi) {
-        const nb = (statsAnnuel.classement || []).filter((x) => x.moyenne !== null && x.moyenne !== undefined).length;
-        h += "<div class='ligne f-annuel'><div class='annuel-carte'>" +
-          "<div><span class='lib'>Moyenne annuelle</span><b class='" + (present(moi.moyenne) ? (moi.moyenne >= 10 ? "valeur-ok" : "valeur-ko") : "") + "'>" + fmt(moi.moyenne, 3) + "</b></div>" +
-          "<div><span class='lib'>Rang annuel</span><b>" + (moi.rang ? rangTexte(moi.rang) : "—") + "</b>" + (nb ? " <span class='lib' style='display:inline'>sur " + nb + "</span>" : "") + "</div>" +
-          "<span class='badge " + (moi.admis ? "ok'>Admis" : "ko'>Non admis") + "</span></div></div>";
+        "<div class='rang-bloc'><div class='rang-sur'>Rang</div><div class='rang-grand'>" + medaille(data.rang) + (data.rang ? rangTexte(data.rang) : "—") + "</div>" +
+        "<div class='rang-sur'>" + (effectif ? "sur " + effectif + " élève" + (effectif > 1 ? "s" : "") : "") + (exAequo ? " (ex aequo)" : "") + "</div></div></div>";
+      const moys = classement.map((x) => x.moyenne).filter(present);
+      if (moys.length) {
+        const moyClasse = moys.reduce((a, b) => a + b, 0) / moys.length;
+        h += "<div class='ligne f-bilan'>" +
+          "<div><span>👥 Moyenne de la classe</span><b class='" + clsNote(moyClasse) + "'>" + fmt(moyClasse, 3) + "</b></div>" +
+          "<div><span>📈 Plus forte</span><b class='" + clsNote(Math.max(...moys)) + "'>" + fmt(Math.max(...moys), 3) + "</b></div>" +
+          "<div><span>📉 Plus faible</span><b class='" + clsNote(Math.min(...moys)) + "'>" + fmt(Math.min(...moys), 3) + "</b></div></div>";
       }
+    } else {
+      h += "<div class='ligne f-message' style='min-height:96px'><p>⏳ La moyenne et le rang seront publiés à la clôture du semestre.</p></div>";
+    }
+
+    // --- Résultat de l'année (onglet 2nd semestre, après la clôture annuelle) ---
+    if (bulletinAnnuel && present(bulletinAnnuel.moyenne_annuelle)) {
+      const a = bulletinAnnuel;
+      const eff = a.effectif || data.effectif || null;
+      h += "<div class='ligne f-annuel'><div class='annuel-carte'>" +
+        "<div><span class='lib'>Moyenne annuelle</span><b class='" + (a.moyenne_annuelle >= 10 ? "valeur-ok" : "valeur-ko") + "'>" + fmt(a.moyenne_annuelle, 3) + "</b></div>" +
+        "<div><span class='lib'>Rang annuel</span><b>" + medaille(a.rang_annuel) + (a.rang_annuel ? rangTexte(a.rang_annuel) : "—") + "</b>" + (eff ? " <span class='lib' style='display:inline'>sur " + eff + "</span>" : "") + "</div>" +
+        "<span class='badge " + (a.admis ? "ok'>🎉 Admis" : "ko'>Non admis") + "</span></div></div>";
     }
     return h;
   }
