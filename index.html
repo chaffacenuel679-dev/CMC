@@ -397,6 +397,76 @@
   @media (prefers-reduced-motion: no-preference) { .squelette span { animation: luire 1.2s linear infinite; } }
   @keyframes luire { to { background-position: -200% 0; } }
 
+  /* ---------- Animations ---------- */
+  .barre::after { background-size: 200% 100%; }
+  .btn { transition: background .15s, transform .15s, box-shadow .15s; }
+  .nav-item svg { transition: transform .2s; }
+  .segment button { transition: background .2s, color .2s, box-shadow .2s; }
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes monterFondu { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @keyframes fondu { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes surgir { 0% { opacity: 0; transform: scale(.6); } 70% { opacity: 1; transform: scale(1.08); } 100% { opacity: 1; transform: none; } }
+    @keyframes remplir { from { transform: scaleX(0); } to { transform: none; } }
+    @keyframes glisserBas { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+    @keyframes reflet { from { background-position: 0% 0; } to { background-position: 200% 0; } }
+    @keyframes flotter { 50% { transform: translate(-12px, -8px); } }
+    @keyframes surbrillance { from { background: #FCE3C4; } to { background: var(--colline-pale); } }
+    @keyframes confetti { 0% { opacity: 1; transform: translate(0,0) rotate(0); } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); } }
+
+    /* Connexion */
+    .ciel .identite > * { animation: monterFondu .6s cubic-bezier(.2,.8,.25,1) both; }
+    .ciel .identite > :nth-child(2) { animation-delay: .08s; }
+    .ciel .identite > :nth-child(3) { animation-delay: .16s; }
+    .atouts li { animation: monterFondu .5s cubic-bezier(.2,.8,.25,1) both; }
+    .atouts li:nth-child(1) { animation-delay: .35s; }
+    .atouts li:nth-child(2) { animation-delay: .47s; }
+    .atouts li:nth-child(3) { animation-delay: .59s; }
+    .login-carte { animation: monterFondu .6s .15s cubic-bezier(.2,.8,.25,1) both; }
+
+    /* Barre du haut et boutons */
+    .barre::after { animation: reflet 8s linear infinite; }
+    .btn:not(:disabled):hover { transform: translateY(-1px); }
+    .btn:not(:disabled):active { transform: translateY(1px); }
+    .nav-item:hover svg { transform: translateX(2px) rotate(-6deg); }
+    .statut.ok, .statut.err, .alerte { animation: glisserBas .28s ease-out; }
+
+    /* Vue élève : en-tête et feuille de bulletin */
+    .eleve-tete { animation: monterFondu .55s cubic-bezier(.2,.8,.25,1) both; }
+    .eleve-tete::after { animation: flotter 7s ease-in-out infinite; }
+    .feuille > .ligne, .feuille .tb-mobile > .ligne, .feuille .tb-large tbody tr { animation: fondu .4s ease-out both; }
+    .feuille > .ligne:nth-child(2), .feuille .tb-mobile > .ligne:nth-child(2), .feuille tbody tr:nth-child(1) { animation-delay: .04s; }
+    .feuille .tb-mobile > .ligne:nth-child(3), .feuille tbody tr:nth-child(2) { animation-delay: .08s; }
+    .feuille .tb-mobile > .ligne:nth-child(4), .feuille tbody tr:nth-child(3) { animation-delay: .12s; }
+    .feuille .tb-mobile > .ligne:nth-child(5), .feuille tbody tr:nth-child(4) { animation-delay: .16s; }
+    .feuille .tb-mobile > .ligne:nth-child(6), .feuille tbody tr:nth-child(5) { animation-delay: .2s; }
+    .feuille .tb-mobile > .ligne:nth-child(7), .feuille tbody tr:nth-child(6) { animation-delay: .24s; }
+    .feuille .tb-mobile > .ligne:nth-child(8), .feuille tbody tr:nth-child(7) { animation-delay: .28s; }
+    .feuille .tb-mobile > .ligne:nth-child(9), .feuille tbody tr:nth-child(8) { animation-delay: .32s; }
+    .feuille .tb-mobile > .ligne:nth-child(10), .feuille tbody tr:nth-child(9) { animation-delay: .36s; }
+    .feuille .tb-mobile > .ligne:nth-child(11), .feuille tbody tr:nth-child(10) { animation-delay: .4s; }
+    .feuille .tb-mobile > .ligne:nth-child(n+12), .feuille tbody tr:nth-child(n+11) { animation-delay: .44s; }
+    .tampon.frappe { animation-delay: .35s; }
+    .rang-bloc { animation: surgir .5s .75s cubic-bezier(.3,1.4,.5,1) both; }
+    .f-bilan div { animation: monterFondu .45s cubic-bezier(.2,.8,.25,1) both; }
+    .f-bilan div:nth-child(1) { animation-delay: .9s; }
+    .f-bilan div:nth-child(2) { animation-delay: .98s; }
+    .f-bilan div:nth-child(3) { animation-delay: 1.06s; }
+    .annuel-carte { animation: monterFondu .5s 1.1s cubic-bezier(.2,.8,.25,1) both; }
+    .annuel-carte .badge { animation: surgir .55s 1.5s cubic-bezier(.3,1.4,.5,1) both; }
+
+    /* Classements */
+    .taux-barre span { transform-origin: left; animation: remplir 1s .2s cubic-bezier(.2,.8,.25,1) both; }
+    table.tableau tbody tr { animation: monterFondu .4s cubic-bezier(.2,.8,.25,1) both; }
+    table.tableau tbody tr:nth-child(2) { animation-delay: .05s; }
+    table.tableau tbody tr:nth-child(3) { animation-delay: .1s; }
+    table.tableau tbody tr:nth-child(4) { animation-delay: .15s; }
+    table.tableau tbody tr:nth-child(5) { animation-delay: .2s; }
+    table.tableau tbody tr:nth-child(n+6) { animation-delay: .25s; }
+    table.tableau tr.moi td { animation: surbrillance 1.6s .5s ease-out both; }
+    .liste-ligne { animation: fondu .3s ease-out both; }
+  }
+  .confetti { position: fixed; z-index: 50; width: 8px; height: 12px; border-radius: 2px; pointer-events: none; animation: confetti 1.3s cubic-bezier(.15,.7,.35,1) forwards; }
+
   @media print {
     .barre, .nav, .eleve-choix, .btn { display: none !important; }
     .eleve-tete { background: none; color: var(--encre); box-shadow: none; padding: 0; }
@@ -1607,6 +1677,63 @@
     return h;
   }
 
+</script>
+
+<!-- Animations : compteur de moyenne et confettis "Admis" (n'intervient pas dans les calculs) -->
+<script>
+(function () {
+  if (!window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  var feuille = document.getElementById("feuille");
+  if (!feuille) return;
+  var COULEURS = ["#E25F67", "#E2B84A", "#4F8E6D", "#1D4D3B", "#7FB8E6"];
+
+  // Fait défiler un nombre de 0 jusqu'à sa valeur finale ("12,185" → 0,000 … 12,185)
+  function compter(el, delai) {
+    var texte = el.textContent.trim();
+    if (!/^\d+(,\d+)?$/.test(texte)) return;
+    var decimales = (texte.split(",")[1] || "").length;
+    var cible = parseFloat(texte.replace(",", "."));
+    var duree = 1100, debut = null;
+    el.textContent = (0).toFixed(decimales).replace(".", ",");
+    setTimeout(function () {
+      requestAnimationFrame(function pas(t) {
+        if (debut === null) debut = t;
+        var p = Math.min(1, (t - debut) / duree);
+        var v = cible * (1 - Math.pow(1 - p, 3));
+        el.textContent = p < 1 ? v.toFixed(decimales).replace(".", ",") : texte;
+        if (p < 1) requestAnimationFrame(pas);
+      });
+    }, delai);
+  }
+
+  function confettis(cible) {
+    var r = cible.getBoundingClientRect();
+    for (var i = 0; i < 28; i++) {
+      var c = document.createElement("span");
+      c.className = "confetti";
+      var angle = Math.random() * Math.PI * 2, force = 60 + Math.random() * 90;
+      c.style.left = (r.left + r.width / 2) + "px";
+      c.style.top = (r.top + r.height / 2) + "px";
+      c.style.background = COULEURS[i % COULEURS.length];
+      c.style.setProperty("--dx", Math.cos(angle) * force + "px");
+      c.style.setProperty("--dy", Math.sin(angle) * force - 40 + "px");
+      c.style.setProperty("--rot", (Math.random() * 720 - 360) + "deg");
+      document.body.appendChild(c);
+      setTimeout(c.remove.bind(c), 1400);
+    }
+  }
+
+  function animer() {
+    feuille.querySelectorAll(".tampon .valeur:not([data-anime])").forEach(function (el) { el.dataset.anime = "1"; compter(el, 450); });
+    feuille.querySelectorAll(".f-bilan b:not([data-anime])").forEach(function (el, i) { el.dataset.anime = "1"; compter(el, 900 + i * 80); });
+    feuille.querySelectorAll(".annuel-carte b.valeur-ok:not([data-anime]), .annuel-carte b.valeur-ko:not([data-anime])").forEach(function (el) { el.dataset.anime = "1"; compter(el, 1150); });
+    feuille.querySelectorAll(".annuel-carte .badge.ok:not([data-anime])").forEach(function (el) {
+      el.dataset.anime = "1";
+      setTimeout(function () { if (el.isConnected && el.getBoundingClientRect().height) confettis(el); }, 1750);
+    });
+  }
+  new MutationObserver(animer).observe(feuille, { childList: true, subtree: true });
+})();
 </script>
 </body>
 </html>
