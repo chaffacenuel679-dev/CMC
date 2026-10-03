@@ -269,6 +269,8 @@
   .liste-ligne select { max-width: 250px; height: 40px; }
   @media (max-width: 480px) { .liste-ligne select { max-width: 52%; } }
   .vide { padding: 18px; border: 1.5px dashed var(--trait); border-radius: 12px; color: var(--encre-2); text-align: center; font-size: 14px; }
+  .export-groupe { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .export-groupe select { width: auto; min-width: 150px; }
   .passage { margin-top: 26px; padding-top: 22px; border-top: 1.5px dashed var(--trait); }
   .succ-groupe { margin: 18px 0 8px; }
   .succ-classe { font-size: 16px; margin: 0 0 6px; padding: 8px 12px; border-radius: 10px; background: var(--colline-pale); color: var(--colline); }
@@ -634,12 +636,21 @@
 
       <section id="panel-archives" class="panneau panneau-admin">
         <h2>🗂️ Archives</h2>
-        <p class="intro">Résultats des semestres et des années déjà clôturés, classe par classe.</p>
+        <p class="intro">Résultats des semestres et des années déjà clôturés, classe par classe. Le bouton « Télécharger » crée un fichier Excel (résultats, notes détaillées et statistiques) à conserver, par exemple avant de mettre une vieille année à la corbeille.</p>
         <div class="grille-form deux">
           <div class="champ"><label for="ar-annee">Année scolaire</label><select id="ar-annee"></select></div>
           <div class="champ"><label for="ar-classe">Classe</label><select id="ar-classe"></select></div>
         </div>
-        <button class="btn" id="btn-voir-archives" type="button">Afficher les résultats</button>
+        <div class="actions">
+          <button class="btn" id="btn-voir-archives" type="button">Afficher les résultats</button>
+          <span class="export-groupe">
+            <select id="ar-portee" aria-label="Contenu du fichier à télécharger">
+              <option value="classe">Cette classe</option>
+              <option value="ecole">Toute l'école</option>
+            </select>
+            <button class="btn contour" id="btn-exporter" type="button">⬇️ Télécharger (Excel)</button>
+          </span>
+        </div>
         <div class="statut" id="status-archives" role="status"></div>
         <div id="ar-resultat" style="margin-top:18px"></div>
         <button class="btn danger" id="btn-corbeille" type="button" style="display:none;margin-top:16px">Mettre cette archive à la corbeille</button>
@@ -1543,6 +1554,123 @@
       zone.innerHTML = html;
       derniereArchiveConsultee = { classe, annee, uids: Array.from(uids) };
       if (uids.size > 0) { btnCorbeille.style.display = "inline-flex"; }
+    } catch (e) { showStatus("status-archives", messageErreur(e), false); }
+  }));
+
+
+  // ---- Export Excel des archives ----
+  // La bibliothèque SheetJS n'est chargée qu'au moment du téléchargement (aucun poids en plus pour le site)
+  const URL_XLSX = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+  function chargerXLSX() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise((resolve, reject) => {
+      const sc = document.createElement("script");
+      sc.src = URL_XLSX;
+      sc.onload = () => window.XLSX ? resolve(window.XLSX) : reject(new Error("XLSX absent"));
+      sc.onerror = () => { sc.remove(); reject(new Error("Chargement impossible")); };
+      document.head.appendChild(sc);
+    });
+  }
+  function telechargerFichier(nom, contenu, type) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([contenu], { type }));
+    a.download = nom;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  }
+  // CSV lisible par Excel en français : séparateur « ; », virgule décimale, encodage UTF-8 avec BOM
+  function versCSV(colonnes, lignes) {
+    const cellule = (v) => {
+      if (v === undefined || v === null) return "";
+      if (typeof v === "number") return String(v).replace(".", ",");
+      const t = String(v);
+      return /[;"\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+    };
+    return "﻿" + [colonnes.join(";")].concat(lignes.map((l) => colonnes.map((c) => cellule(l[c])).join(";"))).join("\r\n");
+  }
+  const arrondi = (v, d) => present(v) ? Math.round(v * Math.pow(10, d)) / Math.pow(10, d) : undefined;
+  const COLS_RESULTATS = ["Année", "Classe", "Élève", "Moyenne S1", "Rang S1", "Moyenne S2", "Rang S2", "Moyenne annuelle", "Rang annuel", "Statut annuel"];
+  const COLS_NOTES = ["Année", "Classe", "Élève", "Semestre", "Matière", "Coef", "Interro 1", "Interro 2", "Interro 3", "Moy. interros", "Devoir 1", "Devoir 2", "Moyenne /20", "Points"];
+  const COLS_STATS = ["Année", "Classe", "Période", "Effectif", "Élèves classés", "Taux de réussite (%)", "Moyenne de la classe", "Plus forte", "Plus faible"];
+
+  $("btn-exporter").addEventListener("click", (ev) => occupe(ev.currentTarget, async () => {
+    const annee = $("ar-annee").value;
+    const ecole = $("ar-portee").value === "ecole";
+    const classeChoisie = $("ar-classe").value;
+    cacherStatus("status-archives");
+    if (!annee || (!ecole && !classeChoisie)) { showStatus("status-archives", "Choisissez l'année et la classe.", false); return; }
+    const resultats = [], notes = [], stats = [];
+    try {
+      for (const classe of (ecole ? ORDRE_CLASSES : [classeChoisie])) {
+        const docs = await Promise.all(["_S1", "_S2", "_ANNUEL"].map((suf) => lire(doc(db, "statistiques_classe", classe + "_" + annee + suf))));
+        if (!docs.some((d) => d.exists())) continue;
+        showStatus("status-archives", "Préparation du fichier : " + classe + "…", true);
+        const eleves = new Map();   // uid → { nom, p0: S1, p1: S2, p2: annuel }
+        ["1er semestre", "2nd semestre", "Annuel"].forEach((periode, i) => {
+          if (!docs[i].exists()) return;
+          const d = docs[i].data();
+          const classement = d.classement || [];
+          classement.forEach((x) => {
+            if (!x.uid) return;
+            const e = eleves.get(x.uid) || { nom: x.nom };
+            e["p" + i] = x;
+            eleves.set(x.uid, e);
+          });
+          const moys = classement.map((x) => x.moyenne).filter(present);
+          stats.push({ "Année": annee, "Classe": classe, "Période": periode, "Effectif": d.effectif ?? classement.length, "Élèves classés": moys.length,
+            "Taux de réussite (%)": d.taux_reussite, "Moyenne de la classe": moys.length ? arrondi(moys.reduce((a, b) => a + b, 0) / moys.length, 3) : undefined,
+            "Plus forte": moys.length ? arrondi(Math.max(...moys), 3) : undefined, "Plus faible": moys.length ? arrondi(Math.min(...moys), 3) : undefined });
+        });
+        const rangDe = (e) => (e.p2 && e.p2.rang) || (e.p1 && e.p1.rang) || (e.p0 && e.p0.rang) || 9999;
+        const liste = Array.from(eleves.entries()).sort((a, b) => rangDe(a[1]) - rangDe(b[1]) || a[1].nom.localeCompare(b[1].nom, "fr"));
+        liste.forEach(([, e]) => resultats.push({ "Année": annee, "Classe": classe, "Élève": e.nom,
+          "Moyenne S1": arrondi(e.p0 && e.p0.moyenne, 3), "Rang S1": (e.p0 && e.p0.rang) || undefined,
+          "Moyenne S2": arrondi(e.p1 && e.p1.moyenne, 3), "Rang S2": (e.p1 && e.p1.rang) || undefined,
+          "Moyenne annuelle": arrondi(e.p2 && e.p2.moyenne, 3), "Rang annuel": (e.p2 && e.p2.rang) || undefined,
+          "Statut annuel": e.p2 ? (e.p2.admis ? "Admis" : "Non admis") : undefined }));
+        // Notes détaillées : mêmes calculs que sur le bulletin (lignesBulletin)
+        const taches = [];
+        liste.forEach(([uid, e]) => [1, 2].forEach((sem) => taches.push({ uid, nom: e.nom, sem })));
+        const lus = [];
+        for (let i = 0; i < taches.length; i += 20) {
+          const paquet = taches.slice(i, i + 20);
+          const snaps = await Promise.all(paquet.map((t) => lire(doc(db, "bulletins", idBulletinPour(t.uid, t.sem, annee)))));
+          paquet.forEach((t, k) => lus.push([t, snaps[k]]));
+        }
+        lus.forEach(([t, snap]) => {
+          if (!snap.exists()) return;
+          const d = snap.data();
+          const cl = d.classe || classe;
+          lignesBulletin(cl, d.notes || {}).lignes.forEach((l) => notes.push({ "Année": annee, "Classe": cl, "Élève": t.nom, "Semestre": t.sem === 1 ? "1er" : "2nd",
+            "Matière": l.mat, "Coef": l.coef,
+            "Interro 1": l.conduite ? undefined : arrondi(l.interros[0], 2), "Interro 2": l.conduite ? undefined : arrondi(l.interros[1], 2),
+            "Interro 3": l.conduite ? undefined : arrondi(l.interros[2], 2), "Moy. interros": arrondi(l.moyI, 2),
+            "Devoir 1": arrondi(l.d1, 2), "Devoir 2": arrondi(l.d2, 2), "Moyenne /20": arrondi(l.moy, 2), "Points": arrondi(l.points, 2) }));
+        });
+      }
+      if (!resultats.length) { showStatus("status-archives", "Aucun résultat clôturé à télécharger pour " + (ecole ? "l'école" : classeChoisie) + " en " + annee + ".", false); return; }
+      // Nom de fichier sans accent ni espace (certains navigateurs refusent les accents)
+      const base = ("CMC_resultats_" + annee + "_" + (ecole ? "ecole" : classeChoisie)).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9_.-]+/g, "-");
+      let XLSX = null;
+      try { XLSX = await chargerXLSX(); } catch (e) { console.error("SheetJS :", e); }
+      if (XLSX) {
+        const classeur = XLSX.utils.book_new();
+        [["Résultats", COLS_RESULTATS, resultats, [11, 13, 28]], ["Notes détaillées", COLS_NOTES, notes, [11, 13, 28, 10, 24]], ["Statistiques", COLS_STATS, stats, [11, 13, 14]]]
+          .forEach(([nom, cols, lignes, larges]) => {
+            const feuille = XLSX.utils.json_to_sheet(lignes, { header: cols });
+            feuille["!cols"] = cols.map((c, i) => ({ wch: larges[i] || Math.max(10, c.length + 2) }));
+            feuille["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: lignes.length, c: cols.length - 1 } }) };
+            XLSX.utils.book_append_sheet(classeur, feuille, nom);
+          });
+        XLSX.writeFile(classeur, base + ".xlsx");
+        showStatus("status-archives", "Fichier « " + base + ".xlsx » téléchargé : " + resultats.length + " élève(s), " + notes.length + " lignes de notes.", true);
+      } else {
+        telechargerFichier(base + "_resultats.csv", versCSV(COLS_RESULTATS, resultats), "text/csv;charset=utf-8");
+        telechargerFichier(base + "_notes.csv", versCSV(COLS_NOTES, notes), "text/csv;charset=utf-8");
+        telechargerFichier(base + "_statistiques.csv", versCSV(COLS_STATS, stats), "text/csv;charset=utf-8");
+        showStatus("status-archives", "Le format Excel n'a pas pu être chargé (connexion ?) : 3 fichiers CSV ont été téléchargés à la place. Ils s'ouvrent aussi dans Excel.", true);
+      }
     } catch (e) { showStatus("status-archives", messageErreur(e), false); }
   }));
 
