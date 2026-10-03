@@ -1,55 +1,46 @@
 rules_version = '2';
-// Règles Firestore du portail des résultats du CMC
-// - Administrateur : peut tout lire et tout écrire (inscrire, noter, clôturer, passage d'année, archives).
-// - Élève / parents : lecture seule de son compte, de l'année active, de SES bulletins et des classements.
-// - Personne d'autre : aucun accès.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function connecte() {
-      return request.auth != null;
-    }
-    // Le rôle est lu dans le profil de la personne connectée (utilisateurs/{son uid})
-    function estAdmin() {
-      return connecte()
-        && get(/databases/$(database)/documents/utilisateurs/$(request.auth.uid)).data.role == "admin";
-    }
+    function connecte() { return request.auth != null; }
+    function profil() { return get(/databases/$(database)/documents/utilisateurs/$(request.auth.uid)).data; }
+    function estAdmin() { return connecte() && profil().role == 'admin'; }
+    // Identifiant du bulletin du 1er semestre de l'élève connecté pour une année donnée
+    function monBulletinS1(annee) { return request.auth.uid + '_' + annee + '_S1'; }
 
-    // Comptes (élèves et administrateurs)
+    // Profils : chacun lit le sien, l'admin lit tout
+    // Le rôle d'un compte ne peut pas être changé, et un compte n'est jamais supprimé
+    // (les anciens élèves gardent l'accès à leurs bulletins)
     match /utilisateurs/{uid} {
-      allow get: if connecte() && (request.auth.uid == uid || estAdmin());
-      allow list: if estAdmin();
-      allow create: if estAdmin()
-        && request.resource.data.role in ["eleve", "admin"]
-        && request.resource.data.nom is string;
-      // Un administrateur peut changer la classe, le statut, l'historique… mais pas le rôle
-      allow update: if estAdmin()
-        && request.resource.data.role == resource.data.role;
+      allow read: if connecte() && (request.auth.uid == uid || estAdmin());
+      allow create: if estAdmin() && request.resource.data.role in ['eleve', 'admin'];
+      allow update: if estAdmin() && request.resource.data.role == resource.data.role;
       allow delete: if false;
     }
 
-    // Année scolaire active et années archivées
-    match /config/{docId} {
+    // Bulletins : un élève lit les siens ; lire un bulletin qui n'existe pas encore n'est pas refusé
+    match /bulletins/{id} {
+      allow read: if connecte() && (estAdmin() || resource == null || resource.data.eleve_id == request.auth.uid);
+      allow create, delete: if estAdmin();
+      allow update: if estAdmin() && (resource.data.get('cloture', false) != true
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['expire_le']));
+    }
+
+    // Classements : lisibles par les élèves qui étaient dans cette classe cette année-là,
+    // y compris pour les classements clôturés avant la mise à jour du site
+    match /statistiques_classe/{id} {
+      allow read: if connecte() && (estAdmin() || resource == null
+                  || request.auth.uid in resource.data.get('eleves_uids', [])
+                  || profil().get('classe', '') == resource.data.classe
+                  || get(/databases/$(database)/documents/bulletins/$(monBulletinS1(resource.data.annee_scolaire))).data.classe == resource.data.classe);
+      allow write: if estAdmin();
+    }
+
+    match /corbeille/{id} { allow read, write: if estAdmin(); }
+
+    match /config/{id} {
       allow read: if connecte();
       allow write: if estAdmin();
-    }
-
-    // Bulletins : identifiant = {uid de l'élève}_{année}_{S1|S2|ANNUEL}
-    match /bulletins/{bulletinId} {
-      allow get: if (connecte() && bulletinId.matches(request.auth.uid + "_.*")) || estAdmin();
-      allow list: if estAdmin();
-      allow write: if estAdmin();
-    }
-
-    // Moyennes et classements de classe (visibles par les familles connectées)
-    match /statistiques_classe/{statId} {
-      allow read: if connecte();
-      allow write: if estAdmin();
-    }
-
-    // Corbeille des archives
-    match /corbeille/{id} {
-      allow read, write: if estAdmin();
     }
   }
 }
