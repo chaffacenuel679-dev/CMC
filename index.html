@@ -552,7 +552,7 @@
         </div>
         <button class="btn plein" id="btn-login" type="submit">Se connecter</button>
         <div class="statut" id="status-login" role="alert"></div>
-        <p class="pied">Identifiants perdus ? Adressez-vous au secrétariat du CMC.</p>
+        <p class="pied">🔒 Pour votre sécurité, fermer l'onglet ou le navigateur vous déconnecte.<br>Identifiants perdus ? Adressez-vous au secrétariat du CMC.</p>
       </form>
     </div>
   </div>
@@ -722,7 +722,7 @@
   import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
   import {
     getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-    onAuthStateChanged, signOut
+    onAuthStateChanged, signOut, setPersistence, browserSessionPersistence
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
   import {
     getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, deleteField, getDoc, getDocs,
@@ -740,6 +740,9 @@
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
+  // Connexion gardée seulement pour l'onglet ouvert : fermer l'onglet ou le navigateur déconnecte.
+  // (Une session déjà ouverte avant cette version est aussi basculée dans ce mode.)
+  const persistancePrete = setPersistence(auth, browserSessionPersistence).catch((e) => console.error("Persistance de session :", e));
   const db = getFirestore(app);
 
   // ================= BARÈME : coefficients par classe (modifiable) =================
@@ -1055,7 +1058,7 @@
     if (!email || !password) { showStatus("status-login", "Saisissez l'adresse e-mail et le mot de passe.", false); return; }
     cacherStatus("status-login");
     occupe($("btn-login"), async () => {
-      try { await signInWithEmailAndPassword(auth, email, password); $("l-password").value = ""; }
+      try { await persistancePrete; await signInWithEmailAndPassword(auth, email, password); $("l-password").value = ""; }
       catch (e) { showStatus("status-login", messageErreur(e), false); }
     });
   });
