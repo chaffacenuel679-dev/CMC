@@ -785,7 +785,55 @@
   // Emojis, drapeaux, teintes de peau, liants invisibles (ZWJ) et sélecteurs de variante
   const RE_EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u200D\uFE0F\u20E3]/gu;
   const RE_NOM = /^[\p{L}\p{M}][\p{L}\p{M}'’ .\-]*[\p{L}\p{M}.]$/u;
-  const RE_EMAIL = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
+  // ================= Adresses e-mail =================
+  // Forme vérifiée selon les règles des adresses e-mail (RFC 5321) : on ne peut pas savoir
+  // si la boîte existe vraiment, mais on refuse les adresses mal formées et les fautes de frappe.
+  const RE_LOCAL = /^[a-z0-9_%+\-]+(\.[a-z0-9_%+\-]+)*$/;          // pas de point au début, à la fin ni doublé
+  const RE_LABEL = /^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$/;         // morceau de domaine : pas de tiret au bord
+  const RE_TLD = /^[a-z]{2,24}$/;                                     // extension : .bj, .com, .fr…
+  const FOURNISSEURS = { gmail: ["com"], yahoo: ["fr", "com"], hotmail: ["fr", "com"], outlook: ["fr", "com"], icloud: ["com"] };
+  const DOMAINES_REELS = ["mail.com", "email.com", "ymail.com", "gmx.com", "gmx.fr", "aol.com", "live.fr", "live.com", "msn.com", "orange.fr", "free.fr", "laposte.net", "proton.me", "protonmail.com"];
+  // Distance entre deux mots (une inversion de deux lettres compte pour une faute)
+  function distance(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+    return d[a.length][b.length];
+  }
+  // Renvoie un message d'erreur, ou null si l'adresse est correcte (l'adresse doit déjà être en minuscules)
+  function verifierEmail(email) {
+    const exemple = " Exemple : prenom.nom@cmc.bj";
+    if (!email) return "Saisissez l'adresse e-mail.";
+    if (/\s/.test(email)) return "L'adresse e-mail ne doit pas contenir d'espace.";
+    if (/[^\x00-\x7f]/.test(email)) return "L'adresse e-mail ne doit contenir ni accent ni caractère spécial (é, è, ç…)." + exemple;
+    const parts = email.split("@");
+    if (parts.length !== 2) return (parts.length < 2 ? "Il manque le « @ » dans l'adresse e-mail." : "L'adresse e-mail ne doit contenir qu'un seul « @ ».") + exemple;
+    const [local, domaine] = parts;
+    if (!local) return "Il manque la partie avant le « @ »." + exemple;
+    if (!domaine) return "Il manque la partie après le « @ »." + exemple;
+    if (email.length > 254 || local.length > 64) return "L'adresse e-mail est trop longue.";
+    if (!RE_LOCAL.test(local)) return "La partie avant le « @ » est mal formée : lettres, chiffres, points, tirets et « _ » seulement, sans point au début, à la fin ni deux points de suite." + exemple;
+    const labels = domaine.split(".");
+    if (labels.length < 2) return "Il manque l'extension après le « @ » (par exemple .bj, .com ou .fr)." + exemple;
+    if (!labels.every((l) => RE_LABEL.test(l))) return "La partie après le « @ » est mal formée (point en trop, tiret au mauvais endroit ou caractère interdit)." + exemple;
+    const tld = labels[labels.length - 1];
+    if (!RE_TLD.test(tld)) return "L'extension « ." + tld + " » n'est pas valide : elle doit contenir au moins 2 lettres (par exemple .bj, .com ou .fr).";
+    // Fautes de frappe sur les grands fournisseurs : gmial.com, gmail.co, yaho.fr…
+    if (labels.length === 2 && !DOMAINES_REELS.includes(domaine)) {
+      const nom = labels[0];
+      for (const f in FOURNISSEURS) {
+        const ok = FOURNISSEURS[f];
+        if (nom === f ? !ok.includes(tld) : distance(nom, f) <= (f.length >= 6 ? 2 : 1)) {
+          const ext = ok.includes(tld) ? tld : ok.reduce((m, x) => distance(tld, x) < distance(tld, m) ? x : m);
+          return "Faute de frappe probable : vouliez-vous dire « " + local + "@" + f + "." + ext + " » ?";
+        }
+      }
+    }
+    return null;
+  }
   function aideChamp(input, msg) {
     const champ = input.closest(".champ");
     let el = champ.querySelector(".aide-champ");
@@ -806,12 +854,28 @@
       }
     });
   });
+  ["e-email", "a-email"].forEach((id) => {
+    const input = $(id);
+    input.addEventListener("blur", () => {
+      const v = input.value.trim().toLowerCase();
+      const msg = v ? verifierEmail(v) : null;
+      aideChamp(input, msg ? "⚠️ " + msg : "");
+      if (msg) input.setAttribute("aria-invalid", "true"); else input.removeAttribute("aria-invalid");
+    });
+    input.addEventListener("input", () => {
+      if (!input.getAttribute("aria-invalid")) return;
+      input.removeAttribute("aria-invalid");
+      const aide = input.closest(".champ").querySelector(".aide-champ");
+      if (aide && aide.textContent.startsWith("⚠️")) aideChamp(input, ""); // garde le message « pas d'emoji »
+    });
+  });
   // Vérification finale avant création d'un compte ; renvoie un message d'erreur ou null
   function verifierIdentite(nom, email, password) {
     if (RE_EMOJI.test(nom + email + password)) { RE_EMOJI.lastIndex = 0; return "Les emojis ne sont pas acceptés dans le nom, l'e-mail ou le mot de passe."; }
     RE_EMOJI.lastIndex = 0;
     if (nom !== null && !RE_NOM.test(nom)) return "Le nom ne doit contenir que des lettres, des espaces, des apostrophes ou des tirets.";
-    if (!RE_EMAIL.test(email)) return "Adresse e-mail invalide (exemple : prenom.nom@cmc.bj, sans accent ni espace).";
+    const erreurEmail = verifierEmail(email);
+    if (erreurEmail) return erreurEmail;
     if (password.length < 6) return "Mot de passe trop court : 6 caractères minimum.";
     return null;
   }
