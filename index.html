@@ -272,7 +272,25 @@
   .export-groupe { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .export-groupe select { width: auto; min-width: 150px; }
   .passage { margin-top: 26px; padding-top: 22px; border-top: 1.5px dashed var(--trait); }
-  .succ-groupe { margin: 18px 0 8px; }
+  .succ-groupe { margin: 12px 0; border: 1px solid var(--trait); border-radius: 12px; overflow: hidden; background: var(--feuille); }
+  .succ-groupe.attention { border-color: #E8A33D; box-shadow: 0 0 0 3px rgba(232,163,61,.15); }
+  .succ-tete { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 12px 14px; background: var(--colline-pale); }
+  .succ-tete h4 { margin: 0; font-size: 16px; color: var(--colline); }
+  .succ-tete h4 small { font-family: var(--texte); font-weight: 400; font-size: 13px; color: var(--encre-2); margin-left: 6px; }
+  .succ-resume { display: flex; flex-wrap: wrap; gap: 6px; }
+  .puce-succ { padding: 3px 10px; border-radius: 99px; font-size: 12.5px; font-weight: 700; background: #fff; color: var(--colline); border: 1px solid var(--trait); }
+  .puce-succ.redouble { color: #8A2A30; background: var(--corail-pale); border-color: #F2C4C7; }
+  .puce-succ.depart { color: #5C4300; background: #FFF4D6; border-color: #EBD48F; }
+  .puce-succ.manque { color: #fff; background: #D9822B; border-color: #D9822B; }
+  .succ-groupe .succ-note, .succ-groupe .succ-masse { margin: 10px 14px; }
+  .succ-details > summary { cursor: pointer; padding: 10px 14px; font-size: 14px; font-weight: 700; color: var(--colline-2); list-style: none; border-top: 1px solid #EDF1EF; }
+  .succ-details > summary::-webkit-details-marker { display: none; }
+  .succ-details > summary::before { content: "▸ "; display: inline-block; transition: transform .2s; }
+  .succ-details[open] > summary::before { transform: rotate(90deg); }
+  .succ-details .liste-ligne { margin: 0 14px; }
+  .etat-clotures { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 16px; padding: 12px 14px; border-radius: 12px; background: #F7FAF8; border: 1px solid var(--trait); font-size: 14px; }
+  .etat-clotures b { margin-right: 4px; }
+  .etat-clotures .puce-succ.ok { color: var(--reussi); }
   .succ-classe { font-size: 16px; margin: 0 0 6px; padding: 8px 12px; border-radius: 10px; background: var(--colline-pale); color: var(--colline); }
   .succ-classe small { font-family: var(--texte); font-weight: 400; font-size: 13px; color: var(--encre-2); margin-left: 6px; }
   .succ-note { margin: 4px 0 8px; font-size: 13.5px; color: var(--encre-2); }
@@ -564,6 +582,9 @@
         <button class="nav-item" data-tab="cloture" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
           Clôturer un semestre</button>
+        <button class="nav-item" data-tab="passage" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/><path d="M22 9v6"/></svg>
+          Passage d'année</button>
         <button class="nav-item" data-tab="gerer" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 6.5M18 13.8c2 .8 3.5 3 3.5 6.2"/></svg>
           Gérer les élèves</button>
@@ -618,13 +639,16 @@
         <div><button class="btn" id="btn-cloturer" type="button">Calculer et clôturer</button></div>
         <div class="statut" id="status-cloture" role="status"></div>
         <div id="recap-cloture" style="margin-top:20px"></div>
-        <div id="passage-annee" class="passage" style="display:none">
-          <h3>🎓 Passer à l'année scolaire suivante</h3>
-          <div class="champ" style="max-width:260px"><label for="nouvelle-annee">Nouvelle année scolaire</label><input type="text" id="nouvelle-annee" /></div>
-          <div id="table-succession"></div>
-          <button class="btn" id="btn-confirmer-passage" type="button">Confirmer le passage</button>
-          <div class="statut" id="status-passage" role="status"></div>
-        </div>
+      </section>
+
+      <section id="panel-passage" class="panneau panneau-admin">
+        <h2>🎓 Passage à l'année suivante</h2>
+        <p class="intro">À faire une fois par an, quand toutes les classes ont leur résultat annuel. Chaque élève reçoit sa classe de l'an prochain : vérifiez le résumé de chaque classe et ouvrez la liste seulement pour corriger un cas particulier.</p>
+        <div id="passage-etat"></div>
+        <div class="champ" style="max-width:260px"><label for="nouvelle-annee">Nouvelle année scolaire</label><input type="text" id="nouvelle-annee" /></div>
+        <div id="table-succession"></div>
+        <button class="btn" id="btn-confirmer-passage" type="button">Confirmer le passage</button>
+        <div class="statut" id="status-passage" role="status"></div>
       </section>
 
       <section id="panel-gerer" class="panneau panneau-admin">
@@ -655,7 +679,7 @@
         <div id="ar-resultat" style="margin-top:18px"></div>
         <button class="btn danger" id="btn-corbeille" type="button" style="display:none;margin-top:16px">Mettre cette archive à la corbeille</button>
         <h3>🗑️ Corbeille</h3>
-        <p style="margin:-4px 0 10px;color:var(--encre-2);font-size:14px">Une archive mise à la corbeille est supprimée automatiquement après 20 jours, sauf si vous la restaurez.</p>
+        <p style="margin:-4px 0 10px;color:var(--encre-2);font-size:14px">Une archive mise à la corbeille est supprimée automatiquement après 20 jours, sauf si vous la restaurez (la suppression se fait à la première connexion d'un administrateur après cette date).</p>
         <div id="corbeille-liste"></div>
       </section>
 
@@ -1088,6 +1112,8 @@
       tab.setAttribute("aria-current", "page");
       document.querySelectorAll(".panneau-admin").forEach((p) => p.classList.toggle("actif", p.id === "panel-" + tab.dataset.tab));
       tab.scrollIntoView({ block: "nearest", inline: "nearest" });
+      if (tab.dataset.tab === "cloture") afficherEtatCloture();
+      if (tab.dataset.tab === "passage") verifierBoutonPassage();
     });
   });
 
@@ -1129,6 +1155,7 @@
       const lib = (c) => c + " (" + elevesParClasse[c].length + " élève" + (elevesParClasse[c].length > 1 ? "s" : "") + ")";
       ["n-classe", "c-classe", "g-classe"].forEach((id) => remplirSelect($(id), classes, "Choisir une classe", lib));
       afficherListeGerer();
+      restaurerChoixCloture();
     }, (err) => console.error("Liste des élèves :", err));
 
     stopCorbeille = onSnapshot(collection(db, "corbeille"), afficherCorbeille, (err) => console.error("Corbeille :", err));
@@ -1309,16 +1336,61 @@
   }));
 
   // ---- Clôture ----
+  // Le classement d'un semestre déjà clôturé s'affiche dès qu'on choisit la classe (comme sur le bulletin),
+  // et le dernier choix (classe + semestre) est retrouvé au rechargement de la page.
+  let jetonCloture = 0, choixClotureRestaure = false;
+  function memoriserChoixCloture() {
+    try { localStorage.setItem("cmc_cloture", JSON.stringify({ classe: $("c-classe").value, sem: semestreCloture })); } catch (e) {}
+  }
+  function choisirSemestreCloture(sem) {
+    semestreCloture = sem;
+    document.querySelectorAll("[data-csem]").forEach((b) => b.classList.toggle("active", parseInt(b.dataset.csem) === sem));
+  }
+  function restaurerChoixCloture() {
+    if (choixClotureRestaure) return;
+    choixClotureRestaure = true;
+    let choix = null;
+    try { choix = JSON.parse(localStorage.getItem("cmc_cloture") || "null"); } catch (e) {}
+    if (!choix) return;
+    if (choix.sem === 1 || choix.sem === 2) choisirSemestreCloture(choix.sem);
+    if (choix.classe && Array.from($("c-classe").options).some((o) => o.value === choix.classe)) $("c-classe").value = choix.classe;
+    afficherEtatCloture();
+  }
+  async function afficherEtatCloture() {
+    const classe = $("c-classe").value;
+    const zone = $("recap-cloture"), btn = $("btn-cloturer");
+    const jeton = ++jetonCloture;
+    const etatBouton = (cloture) => { btn.disabled = cloture; btn.textContent = cloture ? "✅ Déjà clôturé" : "Calculer et clôturer"; };
+    if (!classe) { zone.innerHTML = ""; etatBouton(false); return; }
+    zone.innerHTML = "<div class='squelette'><span></span><span></span><span></span></div>";
+    try {
+      if (semestreCloture === 1) {
+        const s1 = await lire(doc(db, "statistiques_classe", idStats(classe, 1)));
+        if (jeton !== jetonCloture) return;
+        etatBouton(s1.exists());
+        zone.innerHTML = s1.exists()
+          ? "<p class='info' style='margin:0 0 14px'>✅ Le 1er semestre de " + esc(classe) + " est clôturé : classement publié aux familles, notes verrouillées.</p>" + construireTableClassement("1er semestre, " + classe, s1.data(), false)
+          : "<div class='vide'>⏳ Le 1er semestre de " + esc(classe) + " n'est pas encore clôturé.</div>";
+      } else {
+        const [s2, an] = await Promise.all([lire(doc(db, "statistiques_classe", idStats(classe, 2))), lire(doc(db, "statistiques_classe", idStatsAnnuel(classe)))]);
+        if (jeton !== jetonCloture) return;
+        etatBouton(an.exists());
+        zone.innerHTML = an.exists()
+          ? "<p class='info' style='margin:0 0 14px'>✅ Le 2nd semestre et le résultat annuel de " + esc(classe) + " sont publiés.</p>" +
+            (s2.exists() ? construireTableClassement("2nd semestre, " + classe, s2.data(), false) : "") + construireTableClassement("Résultat annuel, " + classe, an.data(), true)
+          : "<div class='vide'>⏳ Le 2nd semestre de " + esc(classe) + " n'est pas encore clôturé.</div>";
+      }
+    } catch (e) { if (jeton === jetonCloture) { zone.innerHTML = ""; etatBouton(false); showStatus("status-cloture", messageErreur(e), false); } }
+  }
   document.querySelectorAll("[data-csem]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll("[data-csem]").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      semestreCloture = parseInt(btn.dataset.csem);
-      cacherStatus("status-cloture"); $("recap-cloture").innerHTML = "";
-      verifierBoutonPassage();
+      choisirSemestreCloture(parseInt(btn.dataset.csem));
+      cacherStatus("status-cloture");
+      memoriserChoixCloture();
+      afficherEtatCloture();
     });
   });
-  $("c-classe").addEventListener("change", () => { cacherStatus("status-cloture"); $("recap-cloture").innerHTML = ""; verifierBoutonPassage(); });
+  $("c-classe").addEventListener("change", () => { cacherStatus("status-cloture"); memoriserChoixCloture(); afficherEtatCloture(); });
 
   $("btn-cloturer").addEventListener("click", (ev) => occupe(ev.currentTarget, async () => {
     const classe = $("c-classe").value;
@@ -1333,7 +1405,7 @@
       if (semestreCloture === 1) await cloturerS1(classe, bareme, eleves);
       else await cloturerS2(classe, bareme, eleves);
     } catch (e) { console.error(e); showStatus("status-cloture", messageErreur(e) + " La clôture a été interrompue : relancez-la, les élèves déjà traités seront conservés.", false); }
-  }));
+  }).then(() => afficherEtatCloture()));
 
   async function cloturerS1(classe, bareme, eleves) {
     showStatus("status-cloture", "Lecture des notes…", true);
@@ -1390,7 +1462,6 @@
       const s2 = await getDoc(doc(db, "statistiques_classe", idStats(classe, 2)));
       $("recap-cloture").innerHTML = (s2.exists() ? construireTableClassement("2nd semestre, " + classe, s2.data(), false) : "") +
         construireTableClassement("Résultat annuel, " + classe, statsAnnExistantes.data(), true);
-      verifierBoutonPassage();
       return;
     }
     let listeS2 = lignes.map((l) => {
@@ -1435,26 +1506,30 @@
     $("recap-cloture").innerHTML = construireTableClassement("2nd semestre, " + classe, { classement: classementS2, taux_reussite: tauxS2 }, false) +
       construireTableClassement("Résultat annuel, " + classe, { classement: classementAnnuel, taux_reussite: tauxAnnuel }, true);
     showStatus("status-cloture", "2nd semestre et résultat annuel publiés pour " + classe + ".", true);
-    verifierBoutonPassage();
   }
 
   // ---- Passage à l'année suivante (fonctionnement inchangé, avec une protection en plus) ----
   const DEPART = "__depart__";
   const estTerminale = (c) => /^Terminale/.test(c);
-  // Le passage concerne toute l'école : on affiche les élèves de toutes les classes, regroupés par classe
+  // Le passage concerne toute l'école : un bloc par classe avec un résumé ; la liste des élèves est repliée
+  let jetonPassage = 0;
   async function verifierBoutonPassage() {
-    const classe = $("c-classe").value;
-    const bloc = $("passage-annee");
-    if (!classe || semestreCloture !== 2) { bloc.style.display = "none"; return; }
-    const snap = await lire(doc(db, "statistiques_classe", idStatsAnnuel(classe)));
-    if (!snap.exists()) { bloc.style.display = "none"; return; }
-    bloc.style.display = "block";
+    const jeton = ++jetonPassage;
     const classes = trierClasses(Object.keys(elevesParClasse));
+    const etat = $("passage-etat"), table = $("table-succession"), btn = $("btn-confirmer-passage");
+    if (!classes.length) { etat.innerHTML = "<div class='vide'>📭 Aucun élève actif.</div>"; table.innerHTML = ""; btn.disabled = true; return; }
+    etat.innerHTML = "<div class='squelette'><span></span><span></span></div>";
     const stats = await Promise.all(classes.map((c) => lire(doc(db, "statistiques_classe", idStatsAnnuel(c)))));
+    if (jeton !== jetonPassage) return;
+    const manquantes = classes.filter((c, i) => !stats[i].exists());
+    etat.innerHTML = "<div class='etat-clotures'><b>Résultats annuels publiés : " + (classes.length - manquantes.length) + " / " + classes.length + " classes.</b>" +
+      (manquantes.length ? "Encore à clôturer (menu « Clôturer un semestre », 2nd semestre) : " + manquantes.map((c) => "<span class='puce-succ manque'>" + esc(c) + "</span>").join("")
+                         : "<span class='puce-succ ok'>✅ Toutes les classes sont prêtes</span>") + "</div>";
+    btn.disabled = manquantes.length > 0;
     const options = (val, avecChoix) => (avecChoix ? "<option value=''>— Choisir la classe —</option>" : "") +
       ORDRE_CLASSES.map((c) => "<option value='" + esc(c) + "'" + (c === val ? " selected" : "") + ">" + esc(c) + "</option>").join("") +
       "<option value='" + DEPART + "'" + (val === DEPART ? " selected" : "") + ">🎓 Quitte l'établissement</option>";
-    let html = "<p class='info' style='margin:0 0 12px'>Vérifiez la classe de l'an prochain de <b>chaque élève de l'école</b>. Non admis : redoublement pré-rempli. Terminale : départ pré-rempli (choisissez la Terminale pour un élève qui redouble après le bac). 3ème : choisissez la série de 2nde.</p>";
+    let html = "";
     classes.forEach((c, i) => {
       const st = stats[i];
       const admisParUid = {};
@@ -1462,32 +1537,58 @@
       const suivante = SUCCESSION[c] || "";
       const aFaire = elevesParClasse[c].filter((el) => !el.historique.includes(ANNEE_SCOLAIRE));
       const faits = elevesParClasse[c].length - aFaire.length;
-      html += "<div class='succ-groupe'><h4 class='succ-classe'>" + esc(c) + " <small>" + elevesParClasse[c].length + " élève" + (elevesParClasse[c].length > 1 ? "s" : "") +
-        (st.exists() ? "" : " · ⚠️ année non clôturée") + "</small></h4>";
+      const n = elevesParClasse[c].length;
+      html += "<div class='succ-groupe' data-groupe='" + esc(c) + "'><div class='succ-tete'><h4>" + esc(c) + "<small>" + n + " élève" + (n > 1 ? "s" : "") +
+        (st.exists() ? "" : " · ⚠️ année non clôturée") + "</small></h4><span class='succ-resume' data-resume='" + esc(c) + "'></span></div>";
       if (faits) html += "<p class='succ-note'>✅ " + faits + " élève" + (faits > 1 ? "s" : "") + " déjà passé" + (faits > 1 ? "s" : "") + " à l'année suivante.</p>";
       if (!suivante && !estTerminale(c) && aFaire.length) {
         html += "<div class='succ-masse'><label for='masse-" + i + "'>Tous les admis de " + esc(c) + " vont en :</label><select id='masse-" + i + "' data-masse='" + esc(c) + "'>" + options("", true) + "</select></div>";
       }
-      html += aFaire.map((el) => {
-        const admis = admisParUid[el.uid];
-        const nonAdmis = admis === false;
-        let val, info;
-        if (nonAdmis) { val = c; info = "Non admis, redouble"; }
-        else if (estTerminale(c)) { val = DEPART; info = "Admis, fin de scolarité"; }
-        else if (suivante) { val = suivante; info = admis ? "Admis" : "Passe en " + suivante; }
-        else { val = ""; info = "Admis, série à choisir"; }
-        return "<div class='liste-ligne" + (nonAdmis ? " redouble" : val === "" ? " a-choisir" : "") + "' data-ligne-classe='" + esc(c) + "' data-admis='" + (admis !== false) + "'>" +
-          "<div class='quoi'><b>" + esc(el.nom) + "</b><small>" + info + "</small></div>" +
-          "<select data-succ-uid='" + esc(el.uid) + "' aria-label='Classe de " + esc(el.nom) + " l'an prochain'>" + options(val, val === "") + "</select></div>";
-      }).join("") + "</div>";
+      if (aFaire.length) {
+        html += "<details class='succ-details' data-details='" + esc(c) + "'><summary>Voir et modifier les élèves (" + aFaire.length + ")</summary>" + aFaire.map((el) => {
+          const admis = admisParUid[el.uid];
+          const nonAdmis = admis === false;
+          let val, info;
+          if (nonAdmis) { val = c; info = "Non admis, redouble"; }
+          else if (estTerminale(c)) { val = DEPART; info = "Admis, fin de scolarité"; }
+          else if (suivante) { val = suivante; info = admis ? "Admis" : "Passe en " + suivante; }
+          else { val = ""; info = "Admis, série à choisir"; }
+          return "<div class='liste-ligne" + (nonAdmis ? " redouble" : val === "" ? " a-choisir" : "") + "' data-ligne-classe='" + esc(c) + "' data-admis='" + (admis !== false) + "'>" +
+            "<div class='quoi'><b>" + esc(el.nom) + "</b><small>" + info + "</small></div>" +
+            "<select data-succ-uid='" + esc(el.uid) + "' aria-label='Classe de " + esc(el.nom) + " l'an prochain'>" + options(val, val === "") + "</select></div>";
+        }).join("") + "</details>";
+      }
+      html += "</div>";
     });
-    $("table-succession").innerHTML = html;
-    const majLigne = (sel) => sel.closest(".liste-ligne").classList.toggle("a-choisir", !sel.value);
-    $("table-succession").querySelectorAll("[data-succ-uid]").forEach((sel) => sel.addEventListener("change", () => majLigne(sel)));
-    $("table-succession").querySelectorAll("[data-masse]").forEach((m) => m.addEventListener("change", () => {
-      if (!m.value) return;
-      document.querySelectorAll("[data-ligne-classe='" + m.dataset.masse + "'][data-admis='true'] select").forEach((sel) => { sel.value = m.value; majLigne(sel); });
+    table.innerHTML = html;
+    classes.forEach(majResumeClasse);
+    table.querySelectorAll("[data-succ-uid]").forEach((sel) => sel.addEventListener("change", () => {
+      const ligne = sel.closest(".liste-ligne");
+      ligne.classList.toggle("a-choisir", !sel.value);
+      majResumeClasse(ligne.dataset.ligneClasse);
     }));
+    table.querySelectorAll("[data-masse]").forEach((m) => m.addEventListener("change", () => {
+      if (!m.value) return;
+      table.querySelectorAll("[data-ligne-classe='" + m.dataset.masse + "'][data-admis='true'] select").forEach((sel) => { sel.value = m.value; sel.closest(".liste-ligne").classList.toggle("a-choisir", !sel.value); });
+      majResumeClasse(m.dataset.masse);
+    }));
+  }
+  // Résumé d'une classe : « → 5ème : 28 · Redoublent : 2 · Quittent : 1 · À choisir : 3 »
+  function majResumeClasse(c) {
+    const zone = document.querySelector("[data-resume='" + c + "']");
+    if (!zone) return;
+    const compte = {};
+    document.querySelectorAll("[data-ligne-classe='" + c + "'] select").forEach((sel) => { compte[sel.value] = (compte[sel.value] || 0) + 1; });
+    const puces = [];
+    Object.keys(compte).sort((x, y) => ORDRE_CLASSES.indexOf(x) - ORDRE_CLASSES.indexOf(y)).forEach((v) => {
+      if (v === "" || v === DEPART || v === c) return;
+      puces.push("<span class='puce-succ'>→ " + esc(v) + " : " + compte[v] + "</span>");
+    });
+    if (compte[c]) puces.push("<span class='puce-succ redouble'>Redoublent : " + compte[c] + "</span>");
+    if (compte[DEPART]) puces.push("<span class='puce-succ depart'>🎓 Quittent : " + compte[DEPART] + "</span>");
+    if (compte[""]) puces.push("<span class='puce-succ manque'>⚠️ À choisir : " + compte[""] + "</span>");
+    zone.innerHTML = puces.join("") || "<span class='puce-succ'>Rien à faire</span>";
+    zone.closest(".succ-groupe").classList.toggle("attention", !!compte[""]);
   }
 
   $("btn-confirmer-passage").addEventListener("click", (ev) => occupe(ev.currentTarget, async () => {
@@ -1506,6 +1607,7 @@
     const selects = Array.from(document.querySelectorAll("[data-succ-uid]"));
     const sansChoix = selects.filter((sel) => !sel.value);
     if (sansChoix.length) {
+      sansChoix.forEach((sel) => { const d = sel.closest("details"); if (d) d.open = true; });
       showStatus("status-passage", sansChoix.length + " élève(s) sans classe choisie pour l'an prochain (encadrés en orange), par exemple la série de 2nde après la 3ème.", false);
       sansChoix[0].focus();
       return;
@@ -1524,6 +1626,7 @@
       await setDoc(doc(db, "config", "annee_active"), { valeur: nouvelleAnnee, annees_archivees: arrayUnion(ANNEE_SCOLAIRE) }, { merge: true });
       showStatus("status-passage", "Passage effectué. Nouvelle année scolaire active : " + nouvelleAnnee + ". " + departs + " départ(s) retiré(s) des listes.", true);
       $("table-succession").innerHTML = "";
+      $("passage-etat").innerHTML = "";
     } catch (e) { showStatus("status-passage", messageErreur(e) + " Relancez le passage : les élèves déjà traités ne le seront pas une seconde fois.", false); }
   }));
 
@@ -1714,14 +1817,26 @@
     zone.querySelectorAll("[data-supprimer-def]").forEach((btn) => btn.addEventListener("click", () => {
       const item = items[btn.dataset.supprimerDef];
       if (!confirm("Supprimer DÉFINITIVEMENT " + item.classe + " " + item.annee + " maintenant ? Cette action est irréversible.")) return;
-      occupe(btn, async () => {
-        for (const uid of item.uids || []) {
-          for (const suf of ["_S1", "_S2", "_ANNUEL"]) await deleteDoc(doc(db, "bulletins", uid + "_" + item.annee + suf)).catch(() => {});
-        }
-        for (const suf of ["_S1", "_S2", "_ANNUEL"]) await deleteDoc(doc(db, "statistiques_classe", item.classe + "_" + item.annee + suf)).catch(() => {});
-        await deleteDoc(doc(db, "corbeille", btn.dataset.supprimerDef)).catch((e) => alert(messageErreur(e)));
-      });
+      occupe(btn, () => supprimerArchive(btn.dataset.supprimerDef, item).catch((e) => alert(messageErreur(e))));
     }));
+    // Suppression automatique des archives dont le délai de 20 jours est dépassé
+    // (le TTL de Firestore exige un compte de facturation : c'est donc le site qui s'en charge)
+    const maintenant = Date.now();
+    Object.entries(items).forEach(([id, item]) => {
+      const fin = item.expire_le && item.expire_le.toDate ? item.expire_le.toDate().getTime() : null;
+      if (fin !== null && fin <= maintenant && !purgesEnCours.has(id)) {
+        purgesEnCours.add(id);
+        supprimerArchive(id, item).catch((e) => console.error("Purge de la corbeille :", e)).finally(() => purgesEnCours.delete(id));
+      }
+    });
+  }
+  const purgesEnCours = new Set();
+  async function supprimerArchive(id, item) {
+    const taches = [];
+    (item.uids || []).forEach((uid) => ["_S1", "_S2", "_ANNUEL"].forEach((suf) => taches.push(() => deleteDoc(doc(db, "bulletins", uid + "_" + item.annee + suf)).catch(() => {}))));
+    ["_S1", "_S2", "_ANNUEL"].forEach((suf) => taches.push(() => deleteDoc(doc(db, "statistiques_classe", item.classe + "_" + item.annee + suf)).catch(() => {})));
+    await parPaquets(taches, 20);
+    await deleteDoc(doc(db, "corbeille", id));   // en dernier : en cas d'erreur avant, la purge sera retentée
   }
 
   // ================= Vue élève / parents =================
