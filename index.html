@@ -266,9 +266,18 @@
   .liste-ligne .quoi b { display: block; }
   .liste-ligne .quoi small { color: var(--encre-2); font-size: 13px; }
   .liste-ligne.redouble { background: var(--corail-pale); border-radius: 10px; padding: 12px; border-bottom: 0; margin-bottom: 6px; }
-  .liste-ligne select { max-width: 210px; height: 40px; }
+  .liste-ligne select { max-width: 250px; height: 40px; }
+  @media (max-width: 480px) { .liste-ligne select { max-width: 52%; } }
   .vide { padding: 18px; border: 1.5px dashed var(--trait); border-radius: 12px; color: var(--encre-2); text-align: center; font-size: 14px; }
   .passage { margin-top: 26px; padding-top: 22px; border-top: 1.5px dashed var(--trait); }
+  .succ-groupe { margin: 18px 0 8px; }
+  .succ-classe { font-size: 16px; margin: 0 0 6px; padding: 8px 12px; border-radius: 10px; background: var(--colline-pale); color: var(--colline); }
+  .succ-classe small { font-family: var(--texte); font-weight: 400; font-size: 13px; color: var(--encre-2); margin-left: 6px; }
+  .succ-note { margin: 4px 0 8px; font-size: 13.5px; color: var(--encre-2); }
+  .succ-masse { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; padding: 10px 12px; border: 1.5px dashed #E8C27A; border-radius: 10px; background: #FFF8EA; }
+  .succ-masse label { margin: 0; font-size: 14px; }
+  .succ-masse select { max-width: 230px; height: 40px; }
+  .liste-ligne.a-choisir { background: #FFF4E0; border-radius: 10px; padding: 12px; border-bottom: 0; margin-bottom: 6px; box-shadow: inset 4px 0 0 #E8A33D; }
 
   /* ---------- Vue élève ---------- */
   .eleve { max-width: 920px; margin: 0 auto; padding: 22px 14px 70px; }
@@ -681,7 +690,7 @@
     onAuthStateChanged, signOut
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
   import {
-    getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, deleteField, getDoc,
+    getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, deleteField, getDoc, getDocs,
     onSnapshot, query, where, Timestamp, arrayUnion
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
@@ -891,7 +900,9 @@
     if (!m) return a;
     return (parseInt(m[1]) + 1) + "-" + (parseInt(m[2]) + 1);
   }
+  let MIGRATION_STATUT_OK = false;  // tous les élèves actifs portent statut: "actif"
   function appliquerAnnee(data) {
+    MIGRATION_STATUT_OK = data.migration_statut_actif === true;
     ANNEE_SCOLAIRE = data.valeur || "2026-2027";
     ANNEES_ARCHIVEES = data.annees_archivees || [];
     $("annee-active").textContent = ANNEE_SCOLAIRE;
@@ -1069,14 +1080,38 @@
     });
   });
 
-  function demarrerAdmin() {
-    const q = query(collection(db, "utilisateurs"), where("role", "==", "eleve"));
+  // Écrit des mises à jour par paquets (plus rapide qu'une par une, sans saturer la connexion)
+  async function parPaquets(taches, taille, progression) {
+    for (let i = 0; i < taches.length; i += taille) {
+      await Promise.all(taches.slice(i, i + taille).map((t) => t()));
+      if (progression) progression(Math.min(i + taille, taches.length), taches.length);
+    }
+  }
+  // Une seule fois : marque statut "actif" sur les élèves inscrits avant cette version,
+  // pour que l'administration ne charge plus que les élèves actifs (et non tous les anciens élèves).
+  async function migrerStatutActif() {
+    if (MIGRATION_STATUT_OK) return;
+    const snap = await getDocs(query(collection(db, "utilisateurs"), where("role", "==", "eleve")));
+    const aMarquer = snap.docs.filter((d) => !d.data().statut);
+    await parPaquets(aMarquer.map((d) => () => updateDoc(doc(db, "utilisateurs", d.id), { statut: "actif" })), 20);
+    await setDoc(doc(db, "config", "annee_active"), { migration_statut_actif: true }, { merge: true });
+  }
+
+  async function demarrerAdmin() {
+    let q = query(collection(db, "utilisateurs"), where("role", "==", "eleve"), where("statut", "==", "actif"));
+    try { await migrerStatutActif(); }
+    catch (e) {
+      // En cas d'échec, on garde l'ancienne lecture complète pour ne rien casser ; la migration sera retentée
+      console.error("Migration du statut des élèves :", e);
+      q = query(collection(db, "utilisateurs"), where("role", "==", "eleve"));
+    }
+    if (!session || session.profil.role !== "admin") return; // déconnecté pendant la migration
     stopEleves = onSnapshot(q, (snap) => {
       elevesParClasse = {};
       snap.forEach((d) => {
         const v = d.data();
         if (v.statut === "inactif") return; // élève retiré : exclu de toutes les listes actives
-        (elevesParClasse[v.classe] = elevesParClasse[v.classe] || []).push({ uid: d.id, nom: v.nom });
+        (elevesParClasse[v.classe] = elevesParClasse[v.classe] || []).push({ uid: d.id, nom: v.nom, historique: v.historique_annees || [] });
       });
       Object.values(elevesParClasse).forEach((l) => l.sort((a, b) => a.nom.localeCompare(b.nom, "fr")));
       const classes = trierClasses(Object.keys(elevesParClasse));
@@ -1099,7 +1134,7 @@
     if (probleme) { showStatus("status-eleve", probleme, false); return; }
     try {
       const uid = await creerCompteSansDeconnecter(email, password);
-      await setDoc(doc(db, "utilisateurs", uid), { nom, role: "eleve", classe, eleve_id: uid, email });
+      await setDoc(doc(db, "utilisateurs", uid), { nom, role: "eleve", classe, eleve_id: uid, email, statut: "actif" });
       showStatus("status-eleve", "Compte créé pour " + nom + " (" + classe + "). À remettre à la famille : identifiant « " + email + " », mot de passe « " + password + " ».", true);
       $("e-nom").value = ""; $("e-email").value = ""; $("e-password").value = "";
       $("e-nom").focus();
@@ -1393,6 +1428,9 @@
   }
 
   // ---- Passage à l'année suivante (fonctionnement inchangé, avec une protection en plus) ----
+  const DEPART = "__depart__";
+  const estTerminale = (c) => /^Terminale/.test(c);
+  // Le passage concerne toute l'école : on affiche les élèves de toutes les classes, regroupés par classe
   async function verifierBoutonPassage() {
     const classe = $("c-classe").value;
     const bloc = $("passage-annee");
@@ -1400,19 +1438,45 @@
     const snap = await lire(doc(db, "statistiques_classe", idStatsAnnuel(classe)));
     if (!snap.exists()) { bloc.style.display = "none"; return; }
     bloc.style.display = "block";
-    const eleves = elevesParClasse[classe] || [];
-    const suivante = SUCCESSION[classe] || "";
-    const admisParUid = {};
-    (snap.data().classement || []).forEach((c) => { admisParUid[c.uid] = c.admis; });
-    const options = (val) => "<option value=''>Ne pas changer de classe</option>" +
-      ORDRE_CLASSES.map((c) => "<option value='" + esc(c) + "'" + (c === val ? " selected" : "") + ">" + esc(c) + "</option>").join("");
-    $("table-succession").innerHTML = "<p class='info' style='margin:0 0 12px'>Les élèves non admis sont pré-remplis avec leur classe actuelle (redoublement). Modifiez si nécessaire.</p>" +
-      eleves.map((el) => {
-        const nonAdmis = admisParUid[el.uid] === false;
-        const val = nonAdmis ? classe : suivante;
-        return "<div class='liste-ligne" + (nonAdmis ? " redouble" : "") + "'><div class='quoi'><b>" + esc(el.nom) + "</b><small>" + (nonAdmis ? "Non admis, redouble" : "Admis") + "</small></div>" +
-          "<select data-succ-uid='" + esc(el.uid) + "' aria-label='Nouvelle classe de " + esc(el.nom) + "'>" + options(val) + "</select></div>";
-      }).join("");
+    const classes = trierClasses(Object.keys(elevesParClasse));
+    const stats = await Promise.all(classes.map((c) => lire(doc(db, "statistiques_classe", idStatsAnnuel(c)))));
+    const options = (val, avecChoix) => (avecChoix ? "<option value=''>— Choisir la classe —</option>" : "") +
+      ORDRE_CLASSES.map((c) => "<option value='" + esc(c) + "'" + (c === val ? " selected" : "") + ">" + esc(c) + "</option>").join("") +
+      "<option value='" + DEPART + "'" + (val === DEPART ? " selected" : "") + ">🎓 Quitte l'établissement</option>";
+    let html = "<p class='info' style='margin:0 0 12px'>Vérifiez la classe de l'an prochain de <b>chaque élève de l'école</b>. Non admis : redoublement pré-rempli. Terminale : départ pré-rempli (choisissez la Terminale pour un élève qui redouble après le bac). 3ème : choisissez la série de 2nde.</p>";
+    classes.forEach((c, i) => {
+      const st = stats[i];
+      const admisParUid = {};
+      if (st.exists()) (st.data().classement || []).forEach((x) => { admisParUid[x.uid] = x.admis; });
+      const suivante = SUCCESSION[c] || "";
+      const aFaire = elevesParClasse[c].filter((el) => !el.historique.includes(ANNEE_SCOLAIRE));
+      const faits = elevesParClasse[c].length - aFaire.length;
+      html += "<div class='succ-groupe'><h4 class='succ-classe'>" + esc(c) + " <small>" + elevesParClasse[c].length + " élève" + (elevesParClasse[c].length > 1 ? "s" : "") +
+        (st.exists() ? "" : " · ⚠️ année non clôturée") + "</small></h4>";
+      if (faits) html += "<p class='succ-note'>✅ " + faits + " élève" + (faits > 1 ? "s" : "") + " déjà passé" + (faits > 1 ? "s" : "") + " à l'année suivante.</p>";
+      if (!suivante && !estTerminale(c) && aFaire.length) {
+        html += "<div class='succ-masse'><label for='masse-" + i + "'>Tous les admis de " + esc(c) + " vont en :</label><select id='masse-" + i + "' data-masse='" + esc(c) + "'>" + options("", true) + "</select></div>";
+      }
+      html += aFaire.map((el) => {
+        const admis = admisParUid[el.uid];
+        const nonAdmis = admis === false;
+        let val, info;
+        if (nonAdmis) { val = c; info = "Non admis, redouble"; }
+        else if (estTerminale(c)) { val = DEPART; info = "Admis, fin de scolarité"; }
+        else if (suivante) { val = suivante; info = admis ? "Admis" : "Passe en " + suivante; }
+        else { val = ""; info = "Admis, série à choisir"; }
+        return "<div class='liste-ligne" + (nonAdmis ? " redouble" : val === "" ? " a-choisir" : "") + "' data-ligne-classe='" + esc(c) + "' data-admis='" + (admis !== false) + "'>" +
+          "<div class='quoi'><b>" + esc(el.nom) + "</b><small>" + info + "</small></div>" +
+          "<select data-succ-uid='" + esc(el.uid) + "' aria-label='Classe de " + esc(el.nom) + " l'an prochain'>" + options(val, val === "") + "</select></div>";
+      }).join("") + "</div>";
+    });
+    $("table-succession").innerHTML = html;
+    const majLigne = (sel) => sel.closest(".liste-ligne").classList.toggle("a-choisir", !sel.value);
+    $("table-succession").querySelectorAll("[data-succ-uid]").forEach((sel) => sel.addEventListener("change", () => majLigne(sel)));
+    $("table-succession").querySelectorAll("[data-masse]").forEach((m) => m.addEventListener("change", () => {
+      if (!m.value) return;
+      document.querySelectorAll("[data-ligne-classe='" + m.dataset.masse + "'][data-admis='true'] select").forEach((sel) => { sel.value = m.value; majLigne(sel); });
+    }));
   }
 
   $("btn-confirmer-passage").addEventListener("click", (ev) => occupe(ev.currentTarget, async () => {
@@ -1428,14 +1492,28 @@
       showStatus("status-passage", "Passage impossible : l'année doit d'abord être clôturée dans toutes les classes. Classe(s) restante(s) : " + trierClasses(manquantes).join(", ") + ".", false);
       return;
     }
-    if (!confirm("Passer toute l'école à l'année " + nouvelleAnnee + " ? Cette action change l'année active pour tous les utilisateurs.")) return;
+    const selects = Array.from(document.querySelectorAll("[data-succ-uid]"));
+    const sansChoix = selects.filter((sel) => !sel.value);
+    if (sansChoix.length) {
+      showStatus("status-passage", sansChoix.length + " élève(s) sans classe choisie pour l'an prochain (encadrés en orange), par exemple la série de 2nde après la 3ème.", false);
+      sansChoix[0].focus();
+      return;
+    }
+    const departs = selects.filter((sel) => sel.value === DEPART).length;
+    const redoublent = selects.filter((sel) => sel.value === sel.closest(".liste-ligne").dataset.ligneClasse).length;
+    const montent = selects.length - departs - redoublent;
+    if (!confirm("Passer toute l'école à l'année " + nouvelleAnnee + " ?\n\n• " + montent + " élève(s) changent de classe\n• " + redoublent + " redoublent\n• " + departs + " quittent l'établissement (retirés des listes, historique conservé)\n\nCette action change l'année active pour tous les utilisateurs.")) return;
     try {
-      for (const sel of document.querySelectorAll("[data-succ-uid]")) {
-        if (sel.value) await updateDoc(doc(db, "utilisateurs", sel.dataset.succUid), { classe: sel.value, historique_annees: arrayUnion(ANNEE_SCOLAIRE) });
-      }
+      // historique_annees sert aussi de repère : un élève déjà passé n'est jamais traité deux fois si on relance
+      const taches = selects.map((sel) => () => updateDoc(doc(db, "utilisateurs", sel.dataset.succUid),
+        sel.value === DEPART
+          ? { statut: "inactif", historique_annees: arrayUnion(ANNEE_SCOLAIRE) }
+          : { classe: sel.value, historique_annees: arrayUnion(ANNEE_SCOLAIRE) }));
+      await parPaquets(taches, 20, (n, total) => showStatus("status-passage", "Passage en cours : " + n + " / " + total + " élèves…", true));
       await setDoc(doc(db, "config", "annee_active"), { valeur: nouvelleAnnee, annees_archivees: arrayUnion(ANNEE_SCOLAIRE) }, { merge: true });
-      showStatus("status-passage", "Passage effectué. Nouvelle année scolaire active : " + nouvelleAnnee + ".", true);
-    } catch (e) { showStatus("status-passage", messageErreur(e), false); }
+      showStatus("status-passage", "Passage effectué. Nouvelle année scolaire active : " + nouvelleAnnee + ". " + departs + " départ(s) retiré(s) des listes.", true);
+      $("table-succession").innerHTML = "";
+    } catch (e) { showStatus("status-passage", messageErreur(e) + " Relancez le passage : les élèves déjà traités ne le seront pas une seconde fois.", false); }
   }));
 
   // ---- Archives & corbeille ----
