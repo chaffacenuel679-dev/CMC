@@ -269,8 +269,18 @@
   .liste-ligne select { max-width: 250px; height: 40px; }
   @media (max-width: 480px) { .liste-ligne select { max-width: 52%; } }
   .vide { padding: 18px; border: 1.5px dashed var(--trait); border-radius: 12px; color: var(--encre-2); text-align: center; font-size: 14px; }
-  .export-groupe { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .export-groupe select { width: auto; min-width: 150px; }
+  .export-boite { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: #F7FAF8; border: 1px dashed var(--trait); }
+  .export-titre { font-size: 14px; font-weight: 700; margin-right: 4px; }
+  .ar-bulletins { margin-top: 22px; padding-top: 18px; border-top: 1.5px dashed var(--trait); }
+  .ar-bulletins h3 { margin-top: 0 !important; }
+  .ar-aide { margin: -4px 0 12px; font-size: 14px; color: var(--encre-2); }
+  .corbeille { margin-top: 26px; border: 1px solid var(--trait); border-radius: 12px; background: var(--feuille); }
+  .corbeille > summary { cursor: pointer; padding: 12px 14px; font-family: var(--titre); font-weight: 700; font-size: 16px; list-style: none; display: flex; align-items: center; gap: 10px; }
+  .corbeille > summary::-webkit-details-marker { display: none; }
+  .corbeille > summary::after { content: "▸"; margin-left: auto; color: var(--encre-2); transition: transform .2s; }
+  .corbeille[open] > summary::after { transform: rotate(90deg); }
+  .corbeille > p, .corbeille > #corbeille-liste { margin-left: 14px !important; margin-right: 14px !important; }
+  .corbeille > #corbeille-liste { padding-bottom: 12px; }
   .passage { margin-top: 26px; padding-top: 22px; border-top: 1.5px dashed var(--trait); }
   .succ-groupe { margin: 12px 0; border: 1px solid var(--trait); border-radius: 12px; overflow: hidden; background: var(--feuille); }
   .succ-groupe.attention { border-color: #E8A33D; box-shadow: 0 0 0 3px rgba(232,163,61,.15); }
@@ -685,27 +695,37 @@
 
       <section id="panel-archives" class="panneau panneau-admin">
         <h2>🗂️ Archives</h2>
-        <p class="intro">Résultats des semestres et des années déjà clôturés, classe par classe. Le bouton « Télécharger » crée un fichier Excel (résultats, notes détaillées et statistiques) à conserver, par exemple avant de mettre une vieille année à la corbeille.</p>
+        <p class="intro">Résultats des semestres et des années déjà clôturés, classe par classe. Vous pouvez y consulter le bulletin de chaque élève et télécharger un fichier Excel (résultats, notes détaillées et statistiques) à conserver, par exemple avant de mettre une vieille année à la corbeille.</p>
         <div class="grille-form deux">
           <div class="champ"><label for="ar-annee">Année scolaire</label><select id="ar-annee"></select></div>
           <div class="champ"><label for="ar-classe">Classe</label><select id="ar-classe"></select></div>
         </div>
-        <div class="actions">
-          <button class="btn" id="btn-voir-archives" type="button">Afficher les résultats</button>
-          <span class="export-groupe">
-            <select id="ar-portee" aria-label="Contenu du fichier à télécharger">
-              <option value="classe">Cette classe</option>
-              <option value="ecole">Toute l'école</option>
-            </select>
-            <button class="btn contour" id="btn-exporter" type="button">⬇️ Télécharger (Excel)</button>
-          </span>
+        <button class="btn" id="btn-voir-archives" type="button">Afficher les résultats</button>
+        <div class="export-boite">
+          <span class="export-titre">⬇️ Télécharger en Excel l'année choisie :</span>
+          <button class="btn contour petit" id="btn-exporter" type="button">Seulement la classe <b id="export-classe-nom">choisie</b></button>
+          <button class="btn contour petit" id="btn-exporter-ecole" type="button">Toute l'école (toutes les classes)</button>
         </div>
         <div class="statut" id="status-archives" role="status"></div>
+        <div id="ar-bulletins" class="ar-bulletins" hidden>
+          <h3>📄 Bulletin d'un élève</h3>
+          <p class="ar-aide">Le même bulletin que celui que voient l'élève et ses parents, pour l'année et la classe affichées.</p>
+          <div class="eleve-choix">
+            <div class="champ"><label for="ar-eleve">Élève</label><select id="ar-eleve"></select></div>
+            <div class="segment" role="group" aria-label="Semestre du bulletin">
+              <button type="button" class="active" data-arsem="1">1er semestre</button>
+              <button type="button" data-arsem="2">2nd semestre</button>
+            </div>
+          </div>
+          <article class="feuille" id="ar-feuille" hidden></article>
+        </div>
         <div id="ar-resultat" style="margin-top:18px"></div>
         <button class="btn danger" id="btn-corbeille" type="button" style="display:none;margin-top:16px">Mettre cette archive à la corbeille</button>
-        <h3>🗑️ Corbeille</h3>
-        <p style="margin:-4px 0 10px;color:var(--encre-2);font-size:14px">Une archive mise à la corbeille est supprimée automatiquement après 20 jours, sauf si vous la restaurez (la suppression se fait à la première connexion d'un administrateur après cette date).</p>
-        <div id="corbeille-liste"></div>
+        <details class="corbeille" id="corbeille-bloc">
+          <summary>🗑️ Corbeille <span id="corbeille-compte" class="puce-succ">vide</span></summary>
+          <p style="margin:4px 0 10px;color:var(--encre-2);font-size:14px">Une archive mise à la corbeille est supprimée automatiquement après 20 jours, sauf si vous la restaurez (la suppression se fait à la première connexion d'un administrateur après cette date).</p>
+          <div id="corbeille-liste"></div>
+        </details>
       </section>
 
       <section id="panel-admin" class="panneau panneau-admin">
@@ -1088,7 +1108,12 @@
     });
   });
   // On coupe les écoutes en direct AVANT de se déconnecter (sinon Firebase les refuse une fois déconnecté)
-  $("btn-deconnexion").addEventListener("click", () => { arreterEcouteurs(); session = null; signOut(auth); });
+  // Déconnexion : la page est rechargée pour repartir de zéro (écran de connexion puis première page,
+  // et aucune donnée de la personne précédente ne reste en mémoire)
+  $("btn-deconnexion").addEventListener("click", () => {
+    arreterEcouteurs(); session = null;
+    signOut(auth).finally(() => location.reload());
+  });
 
   onAuthStateChanged(auth, async (user) => {
     arreterEcouteurs();
@@ -1681,6 +1706,8 @@
     btnCorbeille.style.display = "none";
     cacherStatus("status-archives");
     derniereArchiveConsultee = null;
+    archiveBulletins = null;
+    $("ar-bulletins").hidden = true;
     if (!annee || !classe) { showStatus("status-archives", "Choisissez l'année et la classe.", false); return; }
     try {
       const [s1, s2, an] = await Promise.all([
@@ -1698,6 +1725,17 @@
       });
       zone.innerHTML = html;
       derniereArchiveConsultee = { classe, annee, uids: Array.from(uids) };
+      // Liste des élèves de cette classe cette année-là, pour consulter leur bulletin
+      const noms = new Map();
+      [s1, s2, an].forEach((s) => { if (s.exists()) (s.data().classement || []).forEach((x) => { if (x.uid && !noms.has(x.uid)) noms.set(x.uid, x.nom); }); });
+      if (noms.size) {
+        archiveBulletins = { annee, classe };
+        $("ar-eleve").innerHTML = "<option value=''>Choisir un élève (" + noms.size + ")</option>" +
+          Array.from(noms.entries()).sort((a, b) => a[1].localeCompare(b[1], "fr")).map(([u, n]) => "<option value='" + esc(u) + "'>" + esc(n) + "</option>").join("");
+        $("ar-feuille").hidden = true;
+        $("ar-feuille").innerHTML = "";
+        $("ar-bulletins").hidden = false;
+      }
       if (uids.size > 0) { btnCorbeille.style.display = "inline-flex"; }
     } catch (e) { showStatus("status-archives", messageErreur(e), false); }
   }));
@@ -1739,9 +1777,13 @@
   const COLS_NOTES = ["Année", "Classe", "Élève", "Semestre", "Matière", "Coef", "Interro 1", "Interro 2", "Interro 3", "Moy. interros", "Devoir 1", "Devoir 2", "Moyenne /20", "Points"];
   const COLS_STATS = ["Année", "Classe", "Période", "Effectif", "Élèves classés", "Taux de réussite (%)", "Moyenne de la classe", "Plus forte", "Plus faible"];
 
-  $("btn-exporter").addEventListener("click", (ev) => occupe(ev.currentTarget, async () => {
+  const majLibelleExport = () => { $("export-classe-nom").textContent = $("ar-classe").value || "choisie"; };
+  $("ar-classe").addEventListener("change", majLibelleExport);
+  majLibelleExport();
+  $("btn-exporter").addEventListener("click", (ev) => exporterArchives(ev.currentTarget, false));
+  $("btn-exporter-ecole").addEventListener("click", (ev) => exporterArchives(ev.currentTarget, true));
+  function exporterArchives(bouton, ecole) { return occupe(bouton, async () => {
     const annee = $("ar-annee").value;
-    const ecole = $("ar-portee").value === "ecole";
     const classeChoisie = $("ar-classe").value;
     cacherStatus("status-archives");
     if (!annee || (!ecole && !classeChoisie)) { showStatus("status-archives", "Choisissez l'année et la classe.", false); return; }
@@ -1817,7 +1859,7 @@
         showStatus("status-archives", "Le format Excel n'a pas pu être chargé (connexion ?) : 3 fichiers CSV ont été téléchargés à la place. Ils s'ouvrent aussi dans Excel.", true);
       }
     } catch (e) { showStatus("status-archives", messageErreur(e), false); }
-  }));
+  }); }
 
   $("btn-corbeille").addEventListener("click", (ev) => {
     if (!derniereArchiveConsultee) return;
@@ -1837,8 +1879,42 @@
     });
   });
 
+  // ---- Bulletin d'un élève dans les archives (même rendu que pour les familles) ----
+  let archiveBulletins = null, semArchive = 1, jetonArchive = 0;
+  async function afficherBulletinArchive() {
+    const uid = $("ar-eleve").value;
+    const feuille = $("ar-feuille");
+    if (!uid || !archiveBulletins) { feuille.hidden = true; feuille.innerHTML = ""; return; }
+    const { annee, classe } = archiveBulletins;
+    const jeton = ++jetonArchive;
+    feuille.hidden = false;
+    feuille.innerHTML = "<div class='squelette' aria-label='Chargement'><span></span><span></span><span></span><span></span></div>";
+    try {
+      const [b1, b2, bA] = await Promise.all([
+        lire(doc(db, "bulletins", idBulletinPour(uid, 1, annee))),
+        lire(doc(db, "bulletins", idBulletinPour(uid, 2, annee))),
+        lire(doc(db, "bulletins", uid + "_" + annee + "_ANNUEL"))
+      ]);
+      const d1 = b1.exists() ? b1.data() : null, d2 = b2.exists() ? b2.data() : null, dAn = bA.exists() ? bA.data() : null;
+      const classeAnnee = (d1 && d1.classe) || (d2 && d2.classe) || (dAn && dAn.classe) || classe;
+      const st = await lire(doc(db, "statistiques_classe", idStatsPour(classeAnnee, semArchive, annee)));
+      if (jeton !== jetonArchive) return;
+      const data = semArchive === 1 ? d1 : d2;
+      feuille.innerHTML = data
+        ? construireFeuille(data, classeAnnee, semArchive, st.exists() ? st.data() : null, semArchive === 2 ? dAn : null)
+        : feuilleVide(semArchive, ["📭 Aucun bulletin", "Aucune note n'est enregistrée pour ce semestre."]);
+    } catch (e) { if (jeton === jetonArchive) feuille.innerHTML = "<div class='alerte'>" + esc(messageErreur(e)) + "</div>"; }
+  }
+  $("ar-eleve").addEventListener("change", afficherBulletinArchive);
+  document.querySelectorAll("[data-arsem]").forEach((btn) => btn.addEventListener("click", () => {
+    document.querySelectorAll("[data-arsem]").forEach((b) => b.classList.toggle("active", b === btn));
+    semArchive = parseInt(btn.dataset.arsem);
+    afficherBulletinArchive();
+  }));
+
   function afficherCorbeille(snap) {
     const zone = $("corbeille-liste");
+    $("corbeille-compte").textContent = snap.empty ? "vide" : snap.size + " archive" + (snap.size > 1 ? "s" : "");
     if (snap.empty) { zone.innerHTML = "<div class='vide'>📭 La corbeille est vide.</div>"; return; }
     const items = {};
     zone.innerHTML = snap.docs.map((d) => {
