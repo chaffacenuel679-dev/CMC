@@ -290,6 +290,12 @@
   .succ-details .liste-ligne { margin: 0 14px; }
   .etat-clotures { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 16px; padding: 12px 14px; border-radius: 12px; background: #F7FAF8; border: 1px solid var(--trait); font-size: 14px; }
   .etat-clotures b { margin-right: 4px; }
+  .passage-verrou { display: flex; gap: 14px; align-items: flex-start; padding: 18px; border-radius: 14px; background: #FFF8EA; border: 1.5px solid #EBCB8B; }
+  .passage-verrou .verrou-ico { font-size: 28px; line-height: 1; }
+  .passage-verrou > div > b { font-size: 15.5px; }
+  .passage-verrou p { margin: 6px 0 10px; color: var(--encre-2); font-size: 14px; }
+  .passage-verrou .verrou-avance { font-weight: 700; color: var(--encre); margin-bottom: 8px; }
+  [hidden] { display: none !important; }
   .etat-clotures .puce-succ.ok { color: var(--reussi); }
   .succ-classe { font-size: 16px; margin: 0 0 6px; padding: 8px 12px; border-radius: 10px; background: var(--colline-pale); color: var(--colline); }
   .succ-classe small { font-family: var(--texte); font-weight: 400; font-size: 13px; color: var(--encre-2); margin-left: 6px; }
@@ -337,7 +343,16 @@
   table.bulletin th { font-size: 12px; color: var(--encre-2); font-weight: 700; }
   table.bulletin .g { text-align: left; font-weight: 700; padding-left: 4px; }
   table.bulletin td.g { font-size: 14.5px; }
-  table.bulletin .int span { display: inline-block; min-width: 44px; padding: 0 2px; }
+  /* Chaque note dans sa case, pour qu'elles ne se mélangent jamais */
+  table.bulletin .int span, table.bulletin td.dev span, .m-grp span {
+    display: inline-block; min-width: 42px; padding: 1px 4px; margin: 0 2px; border-radius: 6px; text-align: center;
+    background: #F3F6F4; border: 1px solid #DFE7E2; line-height: 18px; }
+  table.bulletin td.dev span { margin: 0; }
+  .vide-n { background: transparent !important; border-color: transparent !important; }
+  /* Titres des devoirs : pastille jaune (texte foncé pour rester lisible) */
+  .lbl-dev, th.th-dev span { background: #FFE27A; color: #5C4300; border-radius: 6px; padding: 2px 7px; font-weight: 800; }
+  .lbl-int { background: var(--colline-pale); color: var(--colline); border-radius: 6px; padding: 2px 7px; font-weight: 800; }
+  table.grille td.td-dev input { background: #FFFBEA; border-color: #F0D78A; }
   table.bulletin .fort { background: rgba(29,77,59,.07); font-weight: 800; }
   table.bulletin td.fort { font-size: 15px; }
   table.bulletin tr.total td { font-weight: 800; background: rgba(228,239,233,.9); box-shadow: inset 0 2px 0 var(--colline); }
@@ -351,6 +366,13 @@
   .m-l1 .coef { font-weight: 400; font-size: 12.5px; color: var(--encre-2); margin-left: 8px; }
   .m-moy { font-weight: 800; font-size: 15.5px; font-variant-numeric: tabular-nums; }
   .m-l2 { justify-content: space-between; gap: 8px; font-size: 14px; font-variant-numeric: tabular-nums; }
+  /* Détail des notes sur téléphone : si tout ne tient pas sur une ligne, le groupe passe à la ligne suivante du cahier */
+  .feuille .ligne.m-l2 { height: auto; min-height: var(--pas); flex-wrap: wrap; align-items: flex-end; column-gap: 10px; row-gap: 0; padding-bottom: 0; }
+  .m-l2 > * { height: var(--pas); display: inline-flex; align-items: flex-end; padding-bottom: 5px; white-space: nowrap; }
+  .m-grp { gap: 2px; }
+  .m-grp i { font-style: normal; font-size: 11px; margin-right: 2px; }
+  .m-grp span { min-width: 38px; font-size: 13px; }
+  .m-l2 .m-pts { margin-left: auto; }
   .m-det { min-width: 0; white-space: nowrap; }
   .m-det i { font-style: normal; font-size: 12px; color: var(--encre-2); margin-right: 5px; }
   .m-det i + span, .m-det span + i { margin-left: 0; }
@@ -407,6 +429,7 @@
     .f-notes { font-size: 13.5px; }
     .f-entetes { font-size: 11px; }
     .m-l2 { font-size: 12.5px; gap: 6px; }
+    .m-grp span { min-width: 34px; font-size: 12.5px; padding: 1px 3px; margin: 0 1px; }
     .m-det span { margin-right: 4px; }
     .m-det i { margin-right: 3px; }
     .m-det span + i { margin-left: 2px; }
@@ -645,9 +668,11 @@
         <h2>🎓 Passage à l'année suivante</h2>
         <p class="intro">À faire une fois par an, quand toutes les classes ont leur résultat annuel. Chaque élève reçoit sa classe de l'an prochain : vérifiez le résumé de chaque classe et ouvrez la liste seulement pour corriger un cas particulier.</p>
         <div id="passage-etat"></div>
-        <div class="champ" style="max-width:260px"><label for="nouvelle-annee">Nouvelle année scolaire</label><input type="text" id="nouvelle-annee" /></div>
-        <div id="table-succession"></div>
-        <button class="btn" id="btn-confirmer-passage" type="button">Confirmer le passage</button>
+        <div id="passage-contenu" hidden>
+          <div class="champ" style="max-width:260px"><label for="nouvelle-annee">Nouvelle année scolaire</label><input type="text" id="nouvelle-annee" /></div>
+          <div id="table-succession"></div>
+          <button class="btn" id="btn-confirmer-passage" type="button">Confirmer le passage</button>
+        </div>
         <div class="statut" id="status-passage" role="status"></div>
       </section>
 
@@ -1289,13 +1314,13 @@
     const cloture = data.cloture === true;
     const dis = cloture ? " disabled" : "";
     let html = cloture ? "<div class='alerte'>🔒 Ce semestre est clôturé pour cet élève : les notes sont verrouillées.</div>" : "";
-    html += "<div class='grille-scroll'><table class='grille'><thead><tr><th>Matières</th>" + EVALS.map((ev) => "<th>" + EVAL_LABELS[ev] + "</th>").join("") + "</tr></thead><tbody>";
+    html += "<div class='grille-scroll'><table class='grille'><thead><tr><th>Matières</th>" + EVALS.map((ev) => ev.startsWith("devoir") ? "<th class='th-dev'><span>" + EVAL_LABELS[ev] + "</span></th>" : "<th>" + EVAL_LABELS[ev] + "</th>").join("") + "</tr></thead><tbody>";
     const bareme = BAREME[classe];
     matieres.forEach((mat, mi) => {
       html += "<tr><td>" + esc(mat) + "<small>coef. " + bareme[mat] + "</small></td>";
       EVALS.forEach((ev) => {
         const v = notes[mat] && present(notes[mat][ev]) ? notes[mat][ev] : "";
-        html += "<td><input type='text' inputmode='decimal' autocomplete='off' id='g_" + mi + "_" + ev + "' value='" + (v === "" ? "" : fmtNote(v)) + "' aria-label='" + esc(mat + " " + EVAL_LABELS[ev]) + "'" + dis + " /></td>";
+        html += "<td" + (ev.startsWith("devoir") ? " class='td-dev'" : "") + "><input type='text' inputmode='decimal' autocomplete='off' id='g_" + mi + "_" + ev + "' value='" + (v === "" ? "" : fmtNote(v)) + "' aria-label='" + esc(mat + " " + EVAL_LABELS[ev]) + "'" + dis + " /></td>";
       });
       html += "</tr>";
     });
@@ -1371,6 +1396,7 @@
         const s1 = await lire(doc(db, "statistiques_classe", idStats(classe, 1)));
         if (jeton !== jetonCloture) return;
         etatBouton(s1.exists());
+        if (s1.exists() && $("status-cloture").classList.contains("ok")) cacherStatus("status-cloture"); // le bandeau ci-dessous suffit
         zone.innerHTML = s1.exists()
           ? "<p class='info' style='margin:0 0 14px'>✅ Le 1er semestre de " + esc(classe) + " est clôturé : classement publié aux familles, notes verrouillées.</p>" + construireTableClassement("1er semestre, " + classe, s1.data(), false)
           : "<div class='vide'>⏳ Le 1er semestre de " + esc(classe) + " n'est pas encore clôturé.</div>";
@@ -1378,6 +1404,7 @@
         const [s2, an] = await Promise.all([lire(doc(db, "statistiques_classe", idStats(classe, 2))), lire(doc(db, "statistiques_classe", idStatsAnnuel(classe)))]);
         if (jeton !== jetonCloture) return;
         etatBouton(an.exists());
+        if (an.exists() && $("status-cloture").classList.contains("ok")) cacherStatus("status-cloture");
         zone.innerHTML = an.exists()
           ? "<p class='info' style='margin:0 0 14px'>✅ Le 2nd semestre et le résultat annuel de " + esc(classe) + " sont publiés.</p>" +
             (s2.exists() ? construireTableClassement("2nd semestre, " + classe, s2.data(), false) : "") + construireTableClassement("Résultat annuel, " + classe, an.data(), true)
@@ -1520,15 +1547,26 @@
     const jeton = ++jetonPassage;
     const classes = trierClasses(Object.keys(elevesParClasse));
     const etat = $("passage-etat"), table = $("table-succession"), btn = $("btn-confirmer-passage");
-    if (!classes.length) { etat.innerHTML = "<div class='vide'>📭 Aucun élève actif.</div>"; table.innerHTML = ""; btn.disabled = true; return; }
+    if (!classes.length) { etat.innerHTML = "<div class='vide'>📭 Aucun élève actif.</div>"; table.innerHTML = ""; $("passage-contenu").hidden = true; return; }
     etat.innerHTML = "<div class='squelette'><span></span><span></span></div>";
     const stats = await Promise.all(classes.map((c) => lire(doc(db, "statistiques_classe", idStatsAnnuel(c)))));
     if (jeton !== jetonPassage) return;
     const manquantes = classes.filter((c, i) => !stats[i].exists());
-    etat.innerHTML = "<div class='etat-clotures'><b>Résultats annuels publiés : " + (classes.length - manquantes.length) + " / " + classes.length + " classes.</b>" +
-      (manquantes.length ? "Encore à clôturer (menu « Clôturer un semestre », 2nd semestre) : " + manquantes.map((c) => "<span class='puce-succ manque'>" + esc(c) + "</span>").join("")
-                         : "<span class='puce-succ ok'>✅ Toutes les classes sont prêtes</span>") + "</div>";
-    btn.disabled = manquantes.length > 0;
+    if (manquantes.length) {
+      // Pour chaque classe en retard, on indique le semestre qui reste à clôturer
+      const s1 = await Promise.all(manquantes.map((c) => lire(doc(db, "statistiques_classe", idStats(c, 1)))));
+      if (jeton !== jetonPassage) return;
+      $("passage-contenu").hidden = true;
+      table.innerHTML = "";
+      etat.innerHTML = "<div class='passage-verrou'><div class='verrou-ico'>🔒</div><div><b>Le passage à l'année supérieure n'est pas encore disponible.</b>" +
+        "<p>Les deux semestres doivent être clôturés dans <b>toutes les classes</b> (menu « Clôturer un semestre ») avant de passer à l'année suivante.</p>" +
+        "<p class='verrou-avance'>Classes prêtes : " + (classes.length - manquantes.length) + " / " + classes.length + "</p>" +
+        "<div class='succ-resume'>" + manquantes.map((c, i) => "<span class='puce-succ manque'>" + esc(c) + " : " + (s1[i].exists() ? "2nd semestre" : "1er et 2nd semestres") + " à clôturer</span>").join("") + "</div></div></div>";
+      return;
+    }
+    $("passage-contenu").hidden = false;
+    etat.innerHTML = "<div class='etat-clotures'><b>Les deux semestres sont clôturés dans les " + classes.length + " classes.</b><span class='puce-succ ok'>✅ Passage possible</span></div>";
+    btn.disabled = false;
     const options = (val, avecChoix) => (avecChoix ? "<option value=''>— Choisir la classe —</option>" : "") +
       ORDRE_CLASSES.map((c) => "<option value='" + esc(c) + "'" + (c === val ? " selected" : "") + ">" + esc(c) + "</option>").join("") +
       "<option value='" + DEPART + "'" + (val === DEPART ? " selected" : "") + ">🎓 Quitte l'établissement</option>";
@@ -1630,6 +1668,7 @@
       showStatus("status-passage", "Passage effectué. Nouvelle année scolaire active : " + nouvelleAnnee + ". " + departs + " départ(s) retiré(s) des listes.", true);
       $("table-succession").innerHTML = "";
       $("passage-etat").innerHTML = "";
+      $("passage-contenu").hidden = true;
     } catch (e) { showStatus("status-passage", messageErreur(e) + " Relancez le passage : les élèves déjà traités ne le seront pas une seconde fois.", false); }
   }));
 
@@ -2009,13 +2048,13 @@
     let h = "<div class='ligne f-titre'><h2>" + titreSemestre(sem) + "</h2><span class='puce " + (cloture ? "cloture'>🔒 Clôturé" : "encours'>✏️ En cours") + "</span></div>";
 
     // --- Ordinateur / tablette : tableau complet ---
-    h += "<div class='tb-large'><table class='bulletin'><thead><tr><th class='g'>Matières</th><th>Coef.</th><th class='int'>Interrogations</th><th>Moy. int.</th><th>Dev. 1</th><th>Dev. 2</th><th class='fort'>Moy. /20</th><th>Points</th></tr></thead><tbody>";
+    h += "<div class='tb-large'><table class='bulletin'><thead><tr><th class='g'>Matières</th><th>Coef.</th><th class='int'>Interrogations</th><th>Moy. int.</th><th class='th-dev'><span>Dev. 1</span></th><th class='th-dev'><span>Dev. 2</span></th><th class='fort'>Moy. /20</th><th>Points</th></tr></thead><tbody>";
     lignes.forEach((l) => {
       if (l.conduite) {
         h += "<tr><td class='g'>" + esc(l.mat) + "</td><td>" + l.coef + "</td><td class='int'></td><td></td><td></td><td></td><td class='fort'>" + neutre(l.moy, 2) + "</td><td>" + neutre(l.points, 2) + "</td></tr>";
       } else {
         h += "<tr><td class='g'>" + esc(l.mat) + "</td><td>" + l.coef + "</td><td class='int'>" + l.interros.map(note).join("") + "</td><td>" + neutre(l.moyI, 2) +
-          "</td><td>" + note(l.d1) + "</td><td>" + note(l.d2) + "</td><td class='fort'>" + neutre(l.moy, 2) + "</td><td>" + neutre(l.points, 2) + "</td></tr>";
+          "</td><td class='dev'>" + note(l.d1) + "</td><td class='dev'>" + note(l.d2) + "</td><td class='fort'>" + neutre(l.moy, 2) + "</td><td>" + neutre(l.points, 2) + "</td></tr>";
       }
     });
     if (cloture) h += "<tr class='total'><td class='g'>Total</td><td>" + totalCoef + "</td><td colspan='5'></td><td>" + fmt(totalPoints, 2) + "</td></tr>";
@@ -2027,7 +2066,7 @@
       h += "<div class='ligne m-l1'><span class='m-nom'>" + esc(l.mat) + "<span class='coef'>coef. " + l.coef + "</span></span><span class='m-moy'>" + neutre(l.moy, 2) + "</span></div>";
       h += l.conduite
         ? "<div class='ligne m-l2'><span class='m-det'>Note de conduite</span><span class='m-pts'>" + (present(l.points) ? fmt(l.points, 2) + " pts" : "") + "</span></div>"
-        : "<div class='ligne m-l2'><span class='m-det'><i>Int.</i>" + l.interros.map(note).join("") + "<i>Dev.</i>" + note(l.d1) + note(l.d2) + "</span><span class='m-pts'>" + (present(l.points) ? fmt(l.points, 2) + " pts" : "") + "</span></div>";
+        : "<div class='ligne m-l2'><span class='m-grp'><i class='lbl-int'>Int.</i>" + l.interros.map(note).join("") + "</span><span class='m-grp'><i class='lbl-dev'>Dev.</i>" + note(l.d1) + note(l.d2) + "</span><span class='m-pts'>" + (present(l.points) ? fmt(l.points, 2) + " pts" : "") + "</span></div>";
     });
     if (cloture) h += "<div class='ligne m-total'><span>Total : " + totalCoef + " coef.</span><span>" + fmt(totalPoints, 2) + " points</span></div>";
     h += "</div>";
