@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "CMC Résultats — Complexe Moderne des Collines",
+  "short_name": "CMC Résultats",
+  "description": "Bulletins, moyennes et classements du Complexe Moderne des Collines (Savè).",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F3F6F4",
+  "theme_color": "#1D4D3B",
+  "icons": [
+    { "src": "icones/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
