@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#1D4D3B" />
+<title>Pas de connexion — CMC Résultats</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px 16px;
+         font-family: "Segoe UI", system-ui, sans-serif; color: #15231D; background: linear-gradient(180deg, #163D2F 0%, #1D4D3B 45%, #F3F6F4 45%); }
+  .carte { width: 100%; max-width: 380px; background: #fff; border-radius: 18px; padding: 30px 24px; text-align: center; box-shadow: 0 18px 40px -16px rgba(21,35,29,.35); }
+  img { width: 84px; height: 84px; border-radius: 50%; }
+  h1 { font-size: 22px; margin: 16px 0 8px; }
+  p { margin: 0 0 22px; color: #55645D; line-height: 1.5; }
+  button { width: 100%; min-height: 46px; border: 0; border-radius: 10px; background: #1D4D3B; color: #fff; font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="carte">
+    <img src="icones/icone-192.png" alt="" />
+    <h1>📶 Pas de connexion internet</h1>
+    <p>Les résultats sont enregistrés en ligne. Vérifiez votre connexion (données mobiles ou Wi-Fi), puis réessayez.</p>
+    <button type="button" onclick="location.reload()">Réessayer</button>
+  </div>
+</body>
+</html>
