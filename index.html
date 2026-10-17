@@ -1373,7 +1373,10 @@
     const raw = input.value.trim().replace(",", ".");
     input.removeAttribute("aria-invalid");
     if (raw === "") return { v: null };
-    const v = parseFloat(raw);
+    // Uniquement des chiffres, avec au plus 2 décimales (12 ou 12,5 ou 12,75).
+    // Refuse les exposants (1e1), les signes (+5, -3), les lettres (12abc) et les espaces.
+    if (!/^\d{1,2}(\.\d{1,2})?$/.test(raw)) { input.setAttribute("aria-invalid", "true"); return { erreur: true }; }
+    const v = Number(raw);
     if (isNaN(v) || v < 0 || v > 20) { input.setAttribute("aria-invalid", "true"); return { erreur: true }; }
     return { v };
   }
