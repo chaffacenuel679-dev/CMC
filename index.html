@@ -123,7 +123,7 @@
   /* ---------- Formulaires & boutons ---------- */
   .champ { margin-bottom: 14px; }
   label, .etiquette { display: block; font-size: 13.5px; font-weight: 700; margin-bottom: 6px; color: var(--encre); }
-  input[type=text], input[type=email], input[type=password], input[type=number], select {
+  input[type=text], input[type=email], input[type=password], input[type=number], input[type=search], select {
     width: 100%; height: 46px; padding: 0 13px; border: 1.5px solid var(--trait); border-radius: 10px;
     background: var(--feuille); font-size: 16px; transition: border-color .15s, box-shadow .15s;
   }
@@ -549,11 +549,78 @@
   }
   .confetti { position: fixed; z-index: 50; width: 8px; height: 12px; border-radius: 2px; pointer-events: none; animation: confetti 1.3s cubic-bezier(.15,.7,.35,1) forwards; }
 
+  /* ---------- Résumé (tableau de bord) ---------- */
+  .resume-cartes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  @media (min-width: 760px) { .resume-cartes { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .resume-carte { padding: 14px; border-radius: 12px; background: #F7FAF8; border: 1px solid var(--trait); min-width: 0; }
+  .resume-carte span { display: block; font-size: 13px; color: var(--encre-2); line-height: 1.3; }
+  .resume-carte b { display: block; margin-top: 4px; font-family: var(--titre); font-size: 26px; line-height: 1.1; color: var(--colline); font-variant-numeric: tabular-nums; }
+  .resume-carte b small { font-size: 15px; color: var(--encre-2); font-weight: 700; }
+  .resume-carte.ok b { color: var(--reussi); }
+  .ligne-cloture .quoi { flex: 0 0 120px; }
+  .ligne-cloture .etats { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 22px; }
+  .ligne-cloture .btn, .ligne-cloture .puce-succ { flex-shrink: 0; }
+  @media (max-width: 560px) {
+    .ligne-cloture { flex-wrap: wrap; }
+    .ligne-cloture .quoi { flex: 1 1 auto; }
+    .ligne-cloture .etats { order: 3; flex-basis: 100%; flex-direction: column; }
+  }
+  .etat { font-size: 13.5px; font-weight: 700; }
+  .etat.fait { color: var(--reussi); }
+  .etat.afaire { color: #B5651D; }
+  .etat small { display: block; font-weight: 400; color: var(--encre-2); font-size: 12.5px; }
+  .espace-ko { flex-shrink: 0; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .manq-classe { margin: 0 0 10px; border: 1px solid var(--trait); border-radius: 12px; background: var(--feuille); overflow: hidden; }
+  .manq-classe > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 11px 14px; list-style: none; background: #F7FAF8; }
+  .manq-classe > summary::-webkit-details-marker { display: none; }
+  .manq-classe > summary::after { content: "▸"; margin-left: auto; color: var(--encre-2); transition: transform .2s; }
+  .manq-classe[open] > summary::after { transform: rotate(90deg); }
+  .manq-classe > summary b { font-family: var(--titre); font-size: 15.5px; }
+  .manq-classe .liste-ligne { margin: 0 14px; }
+  .manq-classe .quoi small { display: block; }
+  .lien-eleve { padding: 0; border: 0; background: none; color: var(--colline); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; text-align: left; }
+  .espace-barre { height: 12px; border-radius: 99px; background: #E3EAE6; overflow: hidden; margin: 8px 0 6px; }
+  .espace-barre span { display: block; height: 100%; min-width: 3px; border-radius: 99px; background: var(--colline-3); }
+  .espace-total { font-size: 15px; }
+  .espace-total b { font-family: var(--titre); font-size: 20px; color: var(--colline); }
+  /* Recherche d'un élève */
+  .resultats-recherche { margin: -4px 0 18px; }
+  .resultats-recherche .compte { margin: 0 0 4px; font-size: 13px; color: var(--encre-2); }
+  .resultats-recherche mark { background: #FFE9A8; color: inherit; border-radius: 3px; padding: 0 1px; }
+  .liste-ligne .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  @media (max-width: 480px) { .liste-ligne.avec-actions { flex-wrap: wrap; } .liste-ligne.avec-actions .actions { width: 100%; justify-content: flex-start; } }
+  .eleve-choix .btn-imprimer { margin: 0 0 16px auto; }
+
+  /* ---------- Impression du bulletin (et « Enregistrer en PDF ») ---------- */
+  .entete-impression, .pied-impression { display: none; }
   @media print {
-    .barre, .nav, .eleve-choix, .btn { display: none !important; }
-    .eleve-tete { background: none; color: var(--encre); box-shadow: none; padding: 0; }
+    @page { size: A4; margin: 12mm; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .barre, .nav, .eleve-choix, .btn, .segment, .vb-barre, .panneau-classement, .confetti, .statut { display: none !important; }
+    .admin, .contenu, .eleve, .vue-bulletin { max-width: none !important; margin: 0 !important; padding: 0 !important; }
+    .entete-impression { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; margin-bottom: 12px; border-bottom: 2px solid var(--colline); }
+    .entete-impression .sceau { width: 54px; height: 54px; border: 1px solid var(--trait); }
+    .entete-impression b { display: block; font-family: var(--titre); font-size: 19px; color: var(--colline); }
+    .entete-impression span { font-size: 13px; color: var(--encre-2); }
+    .entete-impression .ei-doc { margin-left: auto; font-family: var(--titre); font-weight: 700; font-size: 15px; text-align: right; }
+    .pied-impression { display: block; margin: 10px 0 0; font-size: 11px; color: var(--encre-2); text-align: center; }
+    .eleve-tete { background: none !important; color: var(--encre); box-shadow: none; border-radius: 0; padding: 0 0 6px; margin-bottom: 8px; }
+    .eleve-tete::after { display: none; }
+    .eleve-tete h1 { font-size: 22px; }
     .eleve-tete p { color: var(--encre-2); }
-    body { background: #fff; }
+    .feuille { --pas: 27px; background: #fff !important; box-shadow: none; border: 1px solid var(--trait); margin: 0; break-inside: avoid; }
+    .feuille .ligne { padding-left: 12px !important; padding-right: 12px !important; }
+    .tb-large { display: block !important; padding: 0 8px !important; }
+    .tb-mobile { display: none !important; }
+    table.bulletin { font-size: 12.5px; }
+    table.bulletin td.g { font-size: 13px; }
+    table.bulletin th, table.bulletin td { border-bottom: 1px solid #E3E9E6; padding-left: 4px; padding-right: 4px; }
+    table.bulletin .int span, table.bulletin td.dev span { min-width: 36px; }
+    table.bulletin tr.total td { border-top: 2px solid var(--colline); }
+    .f-verdict { height: auto !important; padding: 14px 0 10px !important; }
+    .tampon { width: 124px; height: 124px; transform: rotate(-5deg); }
+    .tampon .valeur { font-size: 29px; }
   }
 </style>
 </head>
@@ -626,11 +693,21 @@
     </div>
   </header>
 
+  <!-- En-tête du bulletin imprimé (invisible à l'écran) -->
+  <div class="entete-impression" aria-hidden="true">
+    <span class="sceau"></span>
+    <div><b>Complexe Moderne des Collines</b><span>Léopold Sédar Senghor, Savè</span></div>
+    <div class="ei-doc">Bulletin de notes</div>
+  </div>
+
   <!-- ===== Vue administration ===== -->
   <div id="vue-admin" class="admin">
     <nav class="nav" aria-label="Administration">
       <div class="nav-liste" role="list">
-        <button class="nav-item" data-tab="inscrire" aria-current="page" type="button">
+        <button class="nav-item" data-tab="resume" aria-current="page" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          Résumé</button>
+        <button class="nav-item" data-tab="inscrire" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M19 8v6M16 11h6"/></svg>
           Inscrire un élève</button>
         <button class="nav-item" data-tab="notes" type="button">
@@ -656,7 +733,22 @@
     </nav>
 
     <main class="contenu">
-      <section id="panel-inscrire" class="panneau panneau-admin actif">
+      <section id="panel-resume" class="panneau panneau-admin actif">
+        <h2>📊 Résumé de l'année</h2>
+        <p class="intro">Vue d'ensemble de l'année <b id="resume-annee">—</b> : élèves, avancement des clôtures, notes manquantes et espace utilisé dans la base de données.</p>
+        <div class="resume-cartes" id="resume-cartes"></div>
+        <h3>🔒 Avancement des clôtures</h3>
+        <div id="resume-clotures"></div>
+        <h3>✍️ Notes manquantes</h3>
+        <p class="ar-aide">Pour chaque classe, les élèves sans aucune note et les matières encore vides du semestre en cours. La vérification lit un document par élève : lancez-la quand vous en avez besoin, par exemple avant une clôture.</p>
+        <button class="btn contour petit" id="btn-notes-manquantes" type="button">🔍 Rechercher les notes manquantes</button>
+        <div id="resume-manquantes" style="margin-top:14px"></div>
+        <h3>💾 Espace utilisé</h3>
+        <div id="resume-espace"></div>
+        <div style="margin-top:18px"><button class="btn contour petit" id="btn-actualiser-resume" type="button">↻ Actualiser le résumé</button></div>
+      </section>
+
+      <section id="panel-inscrire" class="panneau panneau-admin">
         <h2>📝 Inscrire un élève</h2>
         <p class="intro">Le compte créé sert à l'élève et à ses parents. Notez l'identifiant et le mot de passe pour les remettre sur papier à la famille.</p>
         <div class="grille-form deux">
@@ -713,7 +805,9 @@
       <section id="panel-gerer" class="panneau panneau-admin">
         <h2>👥 Gérer les élèves</h2>
         <p class="intro">Un élève retiré n'apparaît plus dans les listes, mais tout son historique de notes est conservé.</p>
-        <div class="champ" style="max-width:360px"><label for="g-classe">Classe</label><select id="g-classe"><option value="">Choisir une classe</option></select></div>
+        <div class="champ" style="max-width:420px"><label for="g-recherche">🔎 Rechercher un élève par son nom (toutes les classes)</label><input type="search" id="g-recherche" placeholder="Par exemple : Koffi, ou Adjovi Koffi" autocomplete="off" spellcheck="false" /></div>
+        <div id="g-resultats"></div>
+        <div class="champ" style="max-width:360px"><label for="g-classe">Ou choisir une classe</label><select id="g-classe"><option value="">Choisir une classe</option></select></div>
         <div id="g-liste"></div>
       </section>
 
@@ -763,6 +857,7 @@
       <section id="vue-bulletin-archive" class="vue-bulletin" hidden>
         <div class="vb-barre">
           <button class="btn contour petit" id="btn-retour-archives" type="button">← Retour aux archives</button>
+          <button class="btn contour petit" id="btn-imprimer-archive" type="button" data-imprimer>🖨️ Imprimer / PDF</button>
           <div class="vb-nav">
             <button class="btn contour petit" id="btn-eleve-prec" type="button" aria-label="Élève précédent">‹ Précédent</button>
             <span id="vb-position" class="vb-position"></span>
@@ -794,13 +889,15 @@
         <button type="button" class="active" data-esem="1">1er semestre</button>
         <button type="button" data-esem="2">2nd semestre</button>
       </div>
+      <button class="btn contour petit btn-imprimer" id="btn-imprimer" type="button" data-imprimer>🖨️ Imprimer / PDF</button>
     </div>
     <article class="feuille" id="feuille" aria-live="polite"></article>
-    <section class="panneau">
+    <section class="panneau panneau-classement">
       <h2>🏆 Classement de la classe</h2>
       <div id="classement-eleve" style="margin-top:16px"></div>
     </section>
   </main>
+  <p class="pied-impression" id="pied-impression" aria-hidden="true"></p>
 </div>
 
 <script type="module">
@@ -811,7 +908,7 @@
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
   import {
     getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, deleteField, getDoc, getDocs,
-    onSnapshot, query, where, Timestamp, arrayUnion, arrayRemove
+    onSnapshot, query, where, Timestamp, arrayUnion, arrayRemove, getCountFromServer
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -1036,6 +1133,7 @@
     ANNEE_SCOLAIRE = data.valeur || "2026-2027";
     ANNEES_ARCHIVEES = data.annees_archivees || [];
     $("annee-active").textContent = ANNEE_SCOLAIRE;
+    $("resume-annee").textContent = ANNEE_SCOLAIRE;
     $("nouvelle-annee").value = incrementerAnnee(ANNEE_SCOLAIRE);
     const sel = $("ar-annee");
     const avant = sel.value;
@@ -1215,6 +1313,7 @@
       tab.setAttribute("aria-current", "page");
       document.querySelectorAll(".panneau-admin").forEach((p) => p.classList.toggle("actif", p.id === "panel-" + tab.dataset.tab));
       tab.scrollIntoView({ block: "nearest", inline: "nearest" });
+      if (tab.dataset.tab === "resume") chargerResume();
       if (tab.dataset.tab === "cloture") afficherEtatCloture();
       if (tab.dataset.tab === "passage") verifierBoutonPassage();
     });
@@ -1258,7 +1357,9 @@
       const lib = (c) => c + " (" + elevesParClasse[c].length + " élève" + (elevesParClasse[c].length > 1 ? "s" : "") + ")";
       ["n-classe", "c-classe", "g-classe"].forEach((id) => remplirSelect($(id), classes, "Choisir une classe", lib));
       afficherListeGerer();
+      afficherRecherche();
       restaurerChoixCloture();
+      if (resumeActif()) { if (!resumeCharge) chargerResume(); else rafraichirResume(); }
     }, (err) => console.error("Liste des élèves :", err));
 
     stopCorbeille = onSnapshot(collection(db, "corbeille"), afficherCorbeille, (err) => console.error("Corbeille :", err));
@@ -1331,18 +1432,213 @@
     zone.innerHTML = elevesParClasse[classe].map((el) =>
       "<div class='liste-ligne'><div class='quoi'><b>" + esc(el.nom) + "</b></div>" +
       "<button class='btn danger petit' type='button' data-retirer='" + esc(el.uid) + "'>Retirer (abandon)</button></div>").join("");
-    zone.querySelectorAll("[data-retirer]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const uid = btn.dataset.retirer;
-        const el = elevesParClasse[classe].find((x) => x.uid === uid);
-        if (!confirm("Retirer " + el.nom + " ? Son historique de notes reste conservé, mais l'élève n'apparaîtra plus dans les listes actives.")) return;
-        occupe(btn, async () => {
-          try { await updateDoc(doc(db, "utilisateurs", uid), { statut: "inactif" }); }
-          catch (e) { alert(messageErreur(e)); }
-        });
-      });
+    zone.querySelectorAll("[data-retirer]").forEach((btn) => btn.addEventListener("click", () => retirerEleve(btn, btn.dataset.retirer, classe)));
+  }
+  function retirerEleve(btn, uid, classe) {
+    const el = (elevesParClasse[classe] || []).find((x) => x.uid === uid);
+    if (!el || !confirm("Retirer " + el.nom + " ? Son historique de notes reste conservé, mais l'élève n'apparaîtra plus dans les listes actives.")) return;
+    occupe(btn, async () => {
+      try { await updateDoc(doc(db, "utilisateurs", uid), { statut: "inactif" }); }
+      catch (e) { alert(messageErreur(e)); }
     });
   }
+
+  // ---- Recherche d'un élève par son nom ----
+  // Elle parcourt la liste des élèves actifs déjà chargée : aucune lecture de plus dans la base.
+  const sansAccent = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  $("g-recherche").addEventListener("input", afficherRecherche);
+  function afficherRecherche() {
+    const zone = $("g-resultats");
+    const saisie = $("g-recherche").value.trim();
+    const mots = sansAccent(saisie).split(/\s+/).filter(Boolean);
+    zone.className = mots.length ? "resultats-recherche" : "";
+    if (!mots.length) { zone.innerHTML = ""; return; }
+    const trouves = [];
+    Object.keys(elevesParClasse).forEach((classe) => elevesParClasse[classe].forEach((el) => {
+      const nom = sansAccent(el.nom);
+      if (mots.every((m) => nom.includes(m))) trouves.push({ uid: el.uid, nom: el.nom, classe });
+    }));
+    if (!trouves.length) { zone.innerHTML = "<div class='vide'>Aucun élève actif ne correspond à « " + esc(saisie) + " ». Les élèves retirés ne sont pas cherchés.</div>"; return; }
+    trouves.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+    const n = trouves.length, max = 50;
+    zone.innerHTML = "<p class='compte'>" + n + " élève" + (n > 1 ? "s trouvés" : " trouvé") + (n > max ? " : les " + max + " premiers sont affichés, précisez le nom" : "") + "</p>" +
+      trouves.slice(0, max).map((el) => "<div class='liste-ligne avec-actions'><div class='quoi'><b>" + surligner(el.nom, mots) + "</b><small>" + esc(el.classe) + "</small></div><div class='actions'>" +
+        "<button class='btn contour petit' type='button' data-r-notes='" + esc(el.uid) + "' data-classe='" + esc(el.classe) + "'>✍️ Notes</button>" +
+        "<button class='btn contour petit' type='button' data-r-bulletin='" + esc(el.uid) + "' data-classe='" + esc(el.classe) + "'>📄 Bulletin</button>" +
+        "<button class='btn danger petit' type='button' data-r-retirer='" + esc(el.uid) + "' data-classe='" + esc(el.classe) + "'>Retirer</button></div></div>").join("");
+    zone.querySelectorAll("[data-r-notes]").forEach((b) => b.addEventListener("click", () => ouvrirSaisie(b.dataset.classe, b.dataset.rNotes, semestreActif)));
+    zone.querySelectorAll("[data-r-bulletin]").forEach((b) => b.addEventListener("click", () => ouvrirBulletinDepuisRecherche(b.dataset.rBulletin, b.dataset.classe)));
+    zone.querySelectorAll("[data-r-retirer]").forEach((b) => b.addEventListener("click", () => retirerEleve(b, b.dataset.rRetirer, b.dataset.classe)));
+  }
+  // Met en évidence les lettres trouvées, accents compris (« eve » trouve « Ève »)
+  function surligner(nom, mots) {
+    const car = Array.from(nom), norm = car.map(sansAccent), origine = [];
+    norm.forEach((t, i) => { for (let j = 0; j < t.length; j++) origine.push(i); });
+    const plat = norm.join(""), marque = car.map(() => false);
+    mots.forEach((m) => { for (let p = plat.indexOf(m); p >= 0; p = plat.indexOf(m, p + m.length)) for (let j = p; j < p + m.length; j++) marque[origine[j]] = true; });
+    let h = "", ouvert = false;
+    car.forEach((c, i) => { if (marque[i] !== ouvert) { h += ouvert ? "</mark>" : "<mark>"; ouvert = marque[i]; } h += esc(c); });
+    return h + (ouvert ? "</mark>" : "");
+  }
+  // Ouvre la saisie des notes d'un élève (depuis la recherche ou le résumé)
+  function ouvrirSaisie(classe, uid, sem) {
+    document.querySelectorAll("#panel-notes [data-sem]").forEach((b) => b.classList.toggle("active", parseInt(b.dataset.sem) === sem));
+    semestreActif = sem;
+    document.querySelector(".nav-item[data-tab='notes']").click();
+    $("n-classe").value = classe;
+    $("n-classe").dispatchEvent(new Event("change"));
+    $("n-eleve").value = uid;
+    $("n-eleve").dispatchEvent(new Event("change"));
+    window.scrollTo(0, 0);
+  }
+
+  // ================= Résumé de l'année (tableau de bord) =================
+  // Taille moyenne mesurée de chaque type de document, index compris (avec les exemptions d'index en place), en Ko
+  const TAILLE_MOYENNE_KO = { utilisateurs: 1.2, bulletins: 2.7, statistiques_classe: 4, corbeille: 3 };
+  const STOCKAGE_GRATUIT_KO = 1024 * 1024;   // 1 Go du plan gratuit
+  let resumeCharge = false, jetonResume = 0;
+  let etatClotures = {};   // classe → { s1, an } : classements publiés de l'année active (null si pas encore clôturé)
+  const resumeActif = () => $("panel-resume").classList.contains("actif");
+  const classesActives = () => trierClasses(Object.keys(elevesParClasse));
+  const taille = (ko) => ko < 1024 ? fmt(ko, ko < 10 ? 1 : 0) + " Ko" : fmt(ko / 1024, 1) + " Mo";
+
+  // Lit l'état de clôture des classes qui ne sont pas encore connues (2 lectures par classe)
+  async function completerEtatClotures(classes) {
+    const aLire = classes.filter((c) => !(c in etatClotures));
+    const lus = await Promise.all(aLire.map((c) => Promise.all([
+      lireStats(doc(db, "statistiques_classe", idStats(c, 1))),
+      lireStats(doc(db, "statistiques_classe", idStatsAnnuel(c)))
+    ])));
+    aLire.forEach((c, i) => { etatClotures[c] = { s1: lus[i][0].exists() ? lus[i][0].data() : null, an: lus[i][1].exists() ? lus[i][1].data() : null }; });
+  }
+  async function chargerResume() {
+    resumeCharge = true;
+    const jeton = ++jetonResume;
+    etatClotures = {};
+    $("resume-manquantes").innerHTML = "";
+    afficherCartesResume();
+    $("resume-clotures").innerHTML = "<div class='squelette'><span></span><span></span><span></span></div>";
+    afficherEspace(jeton);
+    try {
+      await completerEtatClotures(classesActives());
+      if (jeton === jetonResume) { afficherCartesResume(); afficherClotures(); }
+    } catch (e) { if (jeton === jetonResume) $("resume-clotures").innerHTML = "<div class='alerte'>" + esc(messageErreur(e)) + "</div>"; }
+  }
+  // Après une inscription ou un retrait : seuls les compteurs changent (et les classes nouvelles sont lues)
+  async function rafraichirResume() {
+    const jeton = jetonResume;
+    try { await completerEtatClotures(classesActives()); } catch (e) { console.error(e); }
+    if (jeton === jetonResume) { afficherCartesResume(); afficherClotures(); }
+  }
+  function afficherCartesResume() {
+    const classes = classesActives();
+    const connu = classes.every((c) => c in etatClotures);
+    const nb = (cle) => connu ? classes.filter((c) => etatClotures[c][cle]).length : null;
+    const s1 = nb("s1"), an = nb("an");
+    const carte = (lib, val, ok) => "<div class='resume-carte" + (ok ? " ok" : "") + "'><span>" + lib + "</span><b>" + val + "</b></div>";
+    const sur = (n) => (n === null ? "…" : n) + " <small>/ " + classes.length + "</small>";
+    $("resume-cartes").innerHTML =
+      carte("Élèves actifs", classes.reduce((a, c) => a + elevesParClasse[c].length, 0)) +
+      carte("Classes avec des élèves", classes.length) +
+      carte("1er semestre clôturé", sur(s1), classes.length > 0 && s1 === classes.length) +
+      carte("Résultat annuel publié", sur(an), classes.length > 0 && an === classes.length);
+  }
+  function afficherClotures() {
+    const zone = $("resume-clotures");
+    const classes = classesActives();
+    if (!classes.length) { zone.innerHTML = "<div class='vide'>📭 Aucun élève actif pour l'instant.</div>"; return; }
+    const etat = (st, fait, attente) => st
+      ? "<span class='etat fait'>✅ " + fait + (st.taux_reussite !== undefined ? "<small>" + st.taux_reussite + " % de réussite</small>" : "") + "</span>"
+      : "<span class='etat afaire'>⏳ " + attente + "</span>";
+    zone.innerHTML = classes.map((c) => {
+      const e = etatClotures[c] || {}, n = elevesParClasse[c].length;
+      const sem = !e.s1 ? 1 : !e.an ? 2 : 0;
+      return "<div class='liste-ligne ligne-cloture'><div class='quoi'><b>" + esc(c) + "</b><small>" + n + " élève" + (n > 1 ? "s" : "") + "</small></div>" +
+        "<div class='etats'>" + etat(e.s1, "1er semestre clôturé", "1er semestre à clôturer") +
+        etat(e.an, "2nd semestre et année publiés", e.s1 ? "2nd semestre et année à clôturer" : "2nd semestre et année (après le 1er)") + "</div>" +
+        (sem ? "<button class='btn contour petit' type='button' data-vers-cloture='" + esc(c) + "' data-vers-sem='" + sem + "'>Clôturer</button>" : "<span class='puce-succ'>Terminé</span>") + "</div>";
+    }).join("");
+    zone.querySelectorAll("[data-vers-cloture]").forEach((b) => b.addEventListener("click", () => {
+      choisirSemestreCloture(parseInt(b.dataset.versSem));
+      $("c-classe").value = b.dataset.versCloture;
+      cacherStatus("status-cloture");
+      memoriserChoixCloture();
+      document.querySelector(".nav-item[data-tab='cloture']").click();   // affiche l'état de la classe choisie
+      window.scrollTo(0, 0);
+    }));
+  }
+  // Espace utilisé : nombre exact de documents (requêtes de comptage, environ 1 lecture chacune)
+  // multiplié par la taille moyenne mesurée de chaque type de document
+  async function afficherEspace(jeton) {
+    const zone = $("resume-espace");
+    zone.innerHTML = "<div class='squelette'><span></span><span></span></div>";
+    const types = [
+      ["bulletins", "Bulletins", "notes, moyennes, résultats annuels"],
+      ["statistiques_classe", "Classements des classes", "un par classe et par semestre"],
+      ["utilisateurs", "Comptes", "élèves et administrateurs"],
+      ["corbeille", "Corbeille", "archives en attente de suppression"]
+    ];
+    try {
+      const nombres = await Promise.all(types.map(([col]) => getCountFromServer(collection(db, col)).then((r) => r.data().count)));
+      if (jeton !== jetonResume) return;
+      const ko = types.map(([col], i) => nombres[i] * TAILLE_MOYENNE_KO[col]);
+      const total = ko.reduce((a, b) => a + b, 0);
+      const pct = (total / STOCKAGE_GRATUIT_KO) * 100;
+      zone.innerHTML = "<p class='espace-total' style='margin:0'>Environ <b>" + taille(total) + "</b> utilisés sur 1 Go gratuit (" + (pct < 0.1 ? "moins de 0,1" : fmt(pct, 1)) + " %)</p>" +
+        "<div class='espace-barre' role='img' aria-label='" + fmt(pct, 1) + " % utilisés'><span style='width:" + Math.min(100, pct) + "%'></span></div>" +
+        types.map(([, lib, detail], i) => "<div class='liste-ligne'><div class='quoi'><b>" + lib + "</b><small>" + detail + " · " +
+          nombres[i].toLocaleString("fr-FR") + " document" + (nombres[i] > 1 ? "s" : "") + "</small></div><span class='espace-ko'>≈ " + taille(ko[i]) + "</span></div>").join("") +
+        "<p class='ar-aide' style='margin:10px 0 0'>Estimation : nombre réel de documents × taille moyenne mesurée. La valeur exacte se trouve dans la console Google Cloud (page Firestore), mise à jour environ une fois par jour.</p>";
+    } catch (e) {
+      console.error("Espace utilisé :", e);
+      if (jeton === jetonResume) zone.innerHTML = "<div class='alerte'>Estimation indisponible pour le moment : " + esc(messageErreur(e)) + "</div>";
+    }
+  }
+  $("btn-actualiser-resume").addEventListener("click", (ev) => occupe(ev.currentTarget, chargerResume));
+
+  // Notes manquantes du semestre en cours de chaque classe (1er semestre tant qu'il n'est pas clôturé, sinon 2nd)
+  $("btn-notes-manquantes").addEventListener("click", (ev) => occupe(ev.currentTarget, async () => {
+    const zone = $("resume-manquantes");
+    zone.innerHTML = "<div class='squelette'><span></span><span></span><span></span></div>";
+    try {
+      const classes = classesActives();
+      await completerEtatClotures(classes);
+      const semDe = (c) => !etatClotures[c].s1 ? 1 : !etatClotures[c].an ? 2 : 0;
+      const parSemestre = {};
+      for (const sem of new Set(classes.map(semDe).filter(Boolean))) {
+        const snap = await getDocs(query(collection(db, "bulletins"), where("annee_scolaire", "==", ANNEE_SCOLAIRE), where("semestre", "==", sem)));
+        parSemestre[sem] = {};
+        snap.forEach((d) => { parSemestre[sem][d.data().eleve_id] = d.data(); });
+      }
+      const completes = [], terminees = [];
+      let html = "";
+      classes.forEach((c) => {
+        const sem = semDe(c);
+        if (!sem) { terminees.push(c); return; }
+        const matieres = matieresAcademiques(c).concat("Conduite");
+        const sansNote = [], incomplets = [];
+        elevesParClasse[c].forEach((el) => {
+          const b = parSemestre[sem][el.uid];
+          const notes = (b && b.notes) || {};
+          const vides = matieres.filter((m) => moyenneMatiere(notes[m], m) === null);
+          if (vides.length === matieres.length) sansNote.push(el);
+          else if (vides.length) incomplets.push({ el, vides });
+        });
+        const libSem = sem === 1 ? "1er semestre" : "2nd semestre";
+        if (!sansNote.length && !incomplets.length) { completes.push(c + " (" + libSem + ")"); return; }
+        const ligne = (el, detail) => "<div class='liste-ligne'><div class='quoi'><button class='lien-eleve' type='button' data-saisir='" + esc(el.uid) + "' data-classe='" + esc(c) + "' data-vers-sem='" + sem + "'>" + esc(el.nom) + "</button><small>" + esc(detail) + "</small></div></div>";
+        html += "<details class='manq-classe'><summary><b>" + esc(c) + "</b><span class='puce-succ'>" + libSem + "</span>" +
+          (sansNote.length ? "<span class='puce-succ manque'>" + sansNote.length + " sans aucune note</span>" : "") +
+          (incomplets.length ? "<span class='puce-succ depart'>" + incomplets.length + " avec des matières vides</span>" : "") + "</summary>" +
+          sansNote.map((el) => ligne(el, "Aucune note")).join("") +
+          incomplets.map((x) => ligne(x.el, "Sans note : " + x.vides.join(", "))).join("") + "</details>";
+      });
+      if (completes.length) html += "<p class='info'>✅ Toutes les matières ont au moins une note : " + esc(completes.join(", ")) + ".</p>";
+      if (terminees.length) html += "<p class='info'>🎓 Année terminée (2nd semestre clôturé) : " + esc(terminees.join(", ")) + ".</p>";
+      zone.innerHTML = html || "<div class='vide'>📭 Aucun élève actif pour l'instant.</div>";
+      zone.querySelectorAll("[data-saisir]").forEach((b) => b.addEventListener("click", () => ouvrirSaisie(b.dataset.classe, b.dataset.saisir, parseInt(b.dataset.versSem))));
+    } catch (e) { zone.innerHTML = "<div class='alerte'>" + esc(messageErreur(e)) + "</div>"; }
+  }));
 
   // ---- Saisie des notes ----
   $("n-classe").addEventListener("change", (e) => {
@@ -2031,7 +2327,27 @@
     $("vue-admin").classList.remove("mode-bulletin");
     $("vue-bulletin-archive").hidden = true;
     $("ar-feuille").innerHTML = "";
+    if (retourRecherche) {
+      // Bulletin ouvert depuis la recherche : on remet les archives comme elles étaient et on revient à la recherche
+      archiveBulletins = retourRecherche.archive;
+      $("ar-eleve").innerHTML = retourRecherche.options;
+      $("ar-eleve").value = retourRecherche.valeur;
+      retourRecherche = null;
+      $("btn-retour-archives").textContent = "← Retour aux archives";
+      $("g-resultats").scrollIntoView({ block: "start" });
+      return;
+    }
     $("ar-bulletins").scrollIntoView({ block: "start" });
+  }
+  // Bulletin de l'année en cours d'un élève trouvé par la recherche (même vue plein écran que les archives,
+  // avec « Précédent / Suivant » dans sa classe)
+  let retourRecherche = null;
+  function ouvrirBulletinDepuisRecherche(uid, classe) {
+    if (!retourRecherche) retourRecherche = { archive: archiveBulletins, options: $("ar-eleve").innerHTML, valeur: $("ar-eleve").value };
+    archiveBulletins = { annee: ANNEE_SCOLAIRE, classe };
+    $("ar-eleve").innerHTML = (elevesParClasse[classe] || []).map((el) => "<option value='" + esc(el.uid) + "'>" + esc(el.nom) + "</option>").join("");
+    $("btn-retour-archives").textContent = "← Retour à la recherche";
+    ouvrirBulletinArchive(uid);
   }
   $("ar-eleve").addEventListener("change", () => { $("btn-ouvrir-bulletin").disabled = !$("ar-eleve").value; });
   $("btn-ouvrir-bulletin").addEventListener("click", () => ouvrirBulletinArchive($("ar-eleve").value));
@@ -2045,6 +2361,24 @@
     semArchive = parseInt(btn.dataset.arsem);
     afficherBulletinArchive();
   }));
+
+  // ---- Impression du bulletin affiché (la fenêtre d'impression propose aussi « Enregistrer en PDF ») ----
+  const titrePage = document.title;
+  document.querySelectorAll("[data-imprimer]").forEach((btn) => btn.addEventListener("click", () => window.print()));
+  // Aussi quand on imprime par le menu du navigateur : en-tête, pied de page et nom du fichier PDF proposé
+  window.addEventListener("beforeprint", () => {
+    const archive = $("vue-admin").classList.contains("mode-bulletin");
+    const eleve = document.body.dataset.ecran === "eleve";
+    if (!archive && !eleve) return;
+    const nom = $(archive ? "vb-nom" : "eleve-titre").textContent.trim();
+    const classeAnnee = $(archive ? "vb-sous-titre" : "eleve-sous-titre").textContent.replace("Classe de ", "").replace(", année", "").trim();
+    const bouton = document.querySelector(archive ? "[data-arsem].active" : "[data-esem].active");
+    const libSem = bouton && (bouton.dataset.arsem || bouton.dataset.esem) === "2" ? "2nd semestre" : "1er semestre";
+    document.querySelector(".entete-impression .ei-doc").textContent = "Bulletin de notes, " + libSem;
+    $("pied-impression").textContent = "Imprimé le " + new Date().toLocaleDateString("fr-FR") + " depuis le portail des résultats du Complexe Moderne des Collines.";
+    document.title = "Bulletin " + nom + " " + classeAnnee + " " + libSem;
+  });
+  window.addEventListener("afterprint", () => { document.title = titrePage; });
 
   function afficherCorbeille(snap) {
     const zone = $("corbeille-liste");
@@ -2354,6 +2688,13 @@
   var feuille = document.getElementById("feuille");
   if (!feuille) return;
   var COULEURS = ["#E25F67", "#E2B84A", "#4F8E6D", "#1D4D3B", "#7FB8E6"];
+  // À l'impression, les nombres en train de défiler prennent tout de suite leur valeur finale
+  var impression = false;
+  window.addEventListener("beforeprint", function () {
+    impression = true;
+    document.querySelectorAll("[data-final]").forEach(function (el) { el.textContent = el.dataset.final; });
+  });
+  window.addEventListener("afterprint", function () { impression = false; });
 
   // Fait défiler un nombre de 0 jusqu'à sa valeur finale ("12,185" → 0,000 … 12,185)
   function compter(el, delai) {
@@ -2362,11 +2703,12 @@
     var decimales = (texte.split(",")[1] || "").length;
     var cible = parseFloat(texte.replace(",", "."));
     var duree = 1100, debut = null;
+    el.dataset.final = texte;
     el.textContent = (0).toFixed(decimales).replace(".", ",");
     setTimeout(function () {
       requestAnimationFrame(function pas(t) {
         if (debut === null) debut = t;
-        var p = Math.min(1, (t - debut) / duree);
+        var p = impression ? 1 : Math.min(1, (t - debut) / duree);
         var v = cible * (1 - Math.pow(1 - p, 3));
         el.textContent = p < 1 ? v.toFixed(decimales).replace(".", ",") : texte;
         if (p < 1) requestAnimationFrame(pas);
