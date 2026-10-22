@@ -118,7 +118,10 @@
   }
 
   .installer { margin-top: 12px; }
-  .installer-ios { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--colline-pale); color: #23493A; font-size: 13.5px; line-height: 1.45; }
+  .aide-install { margin: 12px 0 0; font-size: 13.5px; line-height: 1.45; color: #23493A; }
+  .aide-install > summary { cursor: pointer; font-weight: 700; color: var(--colline-2); list-style: none; }
+  .aide-install > summary::-webkit-details-marker { display: none; }
+  .aide-install > p { margin: 6px 0 0; padding: 9px 11px; border-radius: 10px; background: var(--colline-pale); }
 
   /* ---------- Formulaires & boutons ---------- */
   .champ { margin-bottom: 14px; }
@@ -203,11 +206,19 @@
     .contenu { padding: 26px 0 80px; }
   }
 
-  .panneau { background: var(--feuille); border: 1px solid var(--trait); border-radius: var(--rayon); padding: 22px 18px; margin-bottom: 18px; box-shadow: var(--ombre); }
+  .panneau { background: var(--feuille); border: 1px solid var(--trait); border-radius: var(--rayon); padding: 18px 14px; margin-bottom: 18px; box-shadow: var(--ombre); }
   @media (min-width: 600px) { .panneau { padding: 28px; } }
   .panneau > h2 { font-size: 23px; display: flex; align-items: center; gap: 10px; }
-  .panneau > .intro { margin: 8px 0 22px; padding-bottom: 18px; border-bottom: 1px solid #EDF1EF; color: var(--encre-2); max-width: none; }
-  .panneau h3 { font-size: 17px; margin: 26px 0 10px; }
+  .panneau > .intro { margin: 6px 0 16px; padding-bottom: 12px; border-bottom: 1px solid #EDF1EF; color: var(--encre-2); font-size: 14px; max-width: none; }
+  .panneau h3 { font-size: 17px; margin: 22px 0 8px; }
+  @media (max-width: 599px) { .panneau > h2 { font-size: 21px; } }
+  /* Boutons compacts : sur téléphone, seule l'icône reste (le texte complet est dans l'infobulle) */
+  .btn.mini { min-height: 32px; padding: 0 10px; font-size: 13px; border-radius: 8px; }
+  @media (max-width: 599px) { .btn-ico .lib { display: none; } .btn-ico { min-width: 38px; padding: 0 9px; } }
+  .titre-ligne { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 22px 0 6px; }
+  .titre-ligne h3 { margin: 0 !important; }
+  .titre-annee { font-size: .68em; font-weight: 700; color: var(--encre-2); }
+  .btn-titre { margin-left: auto; font-size: 16px; }
   .panneau-admin { display: none; }
   .panneau-admin.actif { display: block; }
   @media (prefers-reduced-motion: no-preference) { .panneau-admin.actif { animation: apparaitre .22s ease-out; } }
@@ -278,12 +289,12 @@
   .liste-ligne select { max-width: 250px; height: 40px; }
   @media (max-width: 480px) { .liste-ligne select { max-width: 52%; } }
   .vide { padding: 18px; border: 1.5px dashed var(--trait); border-radius: 12px; color: var(--encre-2); text-align: center; font-size: 14px; }
-  .export-boite { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: #F7FAF8; border: 1px dashed var(--trait); }
+  .export-boite { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
   .export-titre { font-size: 14px; font-weight: 700; margin-right: 4px; }
   .ar-bulletins { margin-top: 22px; padding-top: 18px; border-top: 1.5px dashed var(--trait); }
   .ar-bulletins h3 { margin-top: 0 !important; }
   .ar-aide { margin: -4px 0 12px; font-size: 14px; color: var(--encre-2); }
-  .ar-bulletins .eleve-choix .btn { margin-bottom: 16px; }
+
   /* Bulletin ouvert depuis les archives : seul à l'écran (menu et autres panneaux masqués) */
   #vue-admin.mode-bulletin .nav, #vue-admin.mode-bulletin .panneau-admin { display: none !important; }
   @media (min-width: 960px) { #vue-admin.mode-bulletin { grid-template-columns: 1fr; } }
@@ -552,31 +563,27 @@
   .confetti { position: fixed; z-index: 50; width: 8px; height: 12px; border-radius: 2px; pointer-events: none; animation: confetti 1.3s cubic-bezier(.15,.7,.35,1) forwards; }
 
   /* ---------- Résumé (tableau de bord) ---------- */
-  .resume-cartes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  @media (min-width: 760px) { .resume-cartes { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-  .resume-carte { padding: 14px; border-radius: 12px; background: #F7FAF8; border: 1px solid var(--trait); min-width: 0; }
-  .resume-carte span { display: block; font-size: 13px; color: var(--encre-2); line-height: 1.3; }
-  .resume-carte b { display: block; margin-top: 4px; font-family: var(--titre); font-size: 26px; line-height: 1.1; color: var(--colline); font-variant-numeric: tabular-nums; }
-  .resume-carte b small { font-size: 15px; color: var(--encre-2); font-weight: 700; }
+  .resume-cartes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .resume-carte { padding: 9px 10px; border-radius: 10px; background: #F7FAF8; border: 1px solid var(--trait); min-width: 0; }
+  .resume-carte span { display: block; font-size: 12px; color: var(--encre-2); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .resume-carte b { display: block; margin-top: 2px; font-family: var(--titre); font-size: 21px; line-height: 1.1; color: var(--colline); font-variant-numeric: tabular-nums; }
+  .resume-carte b small { font-size: 12.5px; color: var(--encre-2); font-weight: 700; }
   .resume-carte.ok b { color: var(--reussi); }
-  .ligne-cloture .quoi { flex: 0 0 120px; }
-  .ligne-cloture .etats { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 22px; }
-  .ligne-cloture .btn, .ligne-cloture .puce-succ { flex-shrink: 0; }
-  @media (max-width: 560px) {
-    .ligne-cloture { flex-wrap: wrap; }
-    .ligne-cloture .quoi { flex: 1 1 auto; }
-    .ligne-cloture .etats { order: 3; flex-basis: 100%; flex-direction: column; }
-  }
-  .etat { font-size: 13.5px; font-weight: 700; }
-  .etat.fait { color: var(--reussi); }
-  .etat.afaire { color: #B5651D; }
-  .etat small { display: block; font-weight: 400; color: var(--encre-2); font-size: 12.5px; }
+  table.tableau.compact th { padding: 7px 6px; }
+  table.tableau.compact td { padding: 6px; vertical-align: middle; }
+  table.tableau.compact td small { color: var(--encre-2); font-size: 12px; margin-left: 4px; }
+  .puce-etat { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+  .puce-etat.ok { color: var(--reussi); }
+  .puce-etat.attente { color: #B5651D; }
+  .espace-bloc { margin-top: 18px; }
+  .espace-bloc > #resume-espace { margin: 0 14px; padding-bottom: 12px; }
   .espace-ko { flex-shrink: 0; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .manq-classe { margin: 0 0 10px; border: 1px solid var(--trait); border-radius: 12px; background: var(--feuille); overflow: hidden; }
-  .manq-classe > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 11px 14px; list-style: none; background: #F7FAF8; }
+  .manq-classe > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 8px 12px; list-style: none; background: #F7FAF8; }
   .manq-classe > summary::-webkit-details-marker { display: none; }
-  .manq-classe > summary::after { content: "▸"; margin-left: auto; color: var(--encre-2); transition: transform .2s; }
-  .manq-classe[open] > summary::after { transform: rotate(90deg); }
+  .manq-classe > summary::before { content: "▸"; color: var(--encre-2); transition: transform .2s; }
+  .manq-classe[open] > summary::before { transform: rotate(90deg); }
+  .manq-classe { margin-bottom: 6px; }
   .manq-classe > summary b { font-family: var(--titre); font-size: 15.5px; }
   .manq-classe .liste-ligne { margin: 0 14px; }
   .manq-classe .quoi small { display: block; }
@@ -593,6 +600,8 @@
   .liste-ligne .actions select { width: auto; min-width: 140px; max-width: 200px; height: 36px; font-size: 14px; border-radius: 8px; }
   @media (max-width: 480px) { .liste-ligne.avec-actions { flex-wrap: wrap; } .liste-ligne.avec-actions .actions { width: 100%; justify-content: flex-start; } }
   .eleve-choix .btn-imprimer { margin: 0 0 16px auto; }
+  .ligne-eleve { padding: 8px 0; }
+  .ligne-eleve .actions { flex-wrap: nowrap; flex-shrink: 0; }
 
   /* ---------- Impression du bulletin (et « Enregistrer en PDF ») ---------- */
   .entete-impression, .pied-impression { display: none; }
@@ -678,8 +687,8 @@
         <div class="installer" id="installer" hidden>
           <button type="button" class="btn contour plein" id="btn-installer">📲 Installer l'application</button>
         </div>
-        <p class="installer-ios" id="installer-android" hidden>📲 <b>Pour installer l'application</b> (si ce n'est pas déjà fait) : dans Chrome, touchez le menu <b>⋮</b> en haut à droite, puis <b>« Installer l'application »</b>. Si Chrome demande de choisir, prenez <b>« Installer »</b> et non « Créer un raccourci ».</p>
-        <p class="installer-ios" id="installer-ios" hidden>📲 <b>Sur iPhone</b>, installez l'application : touchez <b>Partager</b> <span aria-hidden="true">⎋</span> en bas de Safari, puis <b>« Sur l'écran d'accueil »</b>.</p>
+        <details class="aide-install" id="installer-android" hidden><summary>📲 Installer l'application</summary><p>Dans Chrome : menu <b>⋮</b> → <b>« Installer l'application »</b> (choisissez « Installer », pas « Créer un raccourci »).</p></details>
+        <details class="aide-install" id="installer-ios" hidden><summary>📲 Installer l'application</summary><p>Dans Safari : <b>Partager</b> <span aria-hidden="true">⎋</span> → <b>« Sur l'écran d'accueil »</b>.</p></details>
         <p class="pied">🔒 Pour votre sécurité, fermer l'onglet ou le navigateur vous déconnecte.<br>Identifiants perdus ? Adressez-vous au secrétariat du CMC.</p>
       </form>
     </div>
@@ -738,23 +747,22 @@
 
     <main class="contenu">
       <section id="panel-resume" class="panneau panneau-admin actif">
-        <h2>📊 Résumé de l'année</h2>
-        <p class="intro">Vue d'ensemble de l'année <b id="resume-annee">—</b> : élèves, avancement des clôtures, notes manquantes et espace utilisé dans la base de données.</p>
+        <h2>📊 Résumé <span class="titre-annee" id="resume-annee">—</span><button class="btn contour mini btn-titre" id="btn-actualiser-resume" type="button" title="Actualiser" aria-label="Actualiser le résumé">↻</button></h2>
         <div class="resume-cartes" id="resume-cartes"></div>
-        <h3>🔒 Avancement des clôtures</h3>
+        <h3>🔒 Clôtures</h3>
         <div id="resume-clotures"></div>
-        <h3>✍️ Notes manquantes</h3>
-        <p class="ar-aide">Pour chaque classe, les élèves sans aucune note et les matières encore vides du semestre en cours. La vérification lit un document par élève : lancez-la quand vous en avez besoin, par exemple avant une clôture.</p>
-        <button class="btn contour petit" id="btn-notes-manquantes" type="button">🔍 Rechercher les notes manquantes</button>
-        <div id="resume-manquantes" style="margin-top:14px"></div>
-        <h3>💾 Espace utilisé</h3>
-        <div id="resume-espace"></div>
-        <div style="margin-top:18px"><button class="btn contour petit" id="btn-actualiser-resume" type="button">↻ Actualiser le résumé</button></div>
+        <div class="titre-ligne"><h3>✍️ Notes manquantes</h3><button class="btn contour mini" id="btn-notes-manquantes" type="button">🔍 Vérifier</button></div>
+        <p class="ar-aide">Semestre en cours : élèves sans note et matières vides (un document lu par élève).</p>
+        <div id="resume-manquantes"></div>
+        <details class="corbeille espace-bloc" id="resume-espace-bloc">
+          <summary>💾 Espace utilisé <span id="resume-espace-total" class="puce-succ">…</span></summary>
+          <div id="resume-espace"></div>
+        </details>
       </section>
 
       <section id="panel-inscrire" class="panneau panneau-admin">
         <h2>📝 Inscrire un élève</h2>
-        <p class="intro">Le compte créé sert à l'élève et à ses parents. Notez l'identifiant et le mot de passe pour les remettre sur papier à la famille.</p>
+        <p class="intro">Un compte pour l'élève et ses parents : notez l'identifiant et le mot de passe pour la famille.</p>
         <div class="grille-form deux">
           <div class="champ"><label for="e-nom">Nom complet</label><input type="text" id="e-nom" autocomplete="off" /></div>
           <div class="champ"><label for="e-classe">Classe</label><select id="e-classe"></select></div>
@@ -767,7 +775,7 @@
 
       <section id="panel-notes" class="panneau panneau-admin">
         <h2>✍️ Saisir les notes</h2>
-        <p class="intro">Une case vide ne compte jamais comme zéro. Les notes d'un semestre clôturé ne peuvent plus être modifiées.</p>
+        <p class="intro">Une case vide ne compte jamais comme zéro. Un semestre clôturé est verrouillé.</p>
         <div class="grille-form deux">
           <div class="champ"><label for="n-classe">Classe</label><select id="n-classe"><option value="">Choisir une classe</option></select></div>
           <div class="champ"><label for="n-eleve">Élève</label><select id="n-eleve"><option value="">Choisir d'abord une classe</option></select></div>
@@ -783,7 +791,7 @@
 
       <section id="panel-cloture" class="panneau panneau-admin">
         <h2>🔒 Clôturer un semestre</h2>
-        <p class="intro">La clôture calcule les moyennes et les rangs, publie le classement aux familles et verrouille les notes du semestre.</p>
+        <p class="intro">Calcule moyennes et rangs, publie le classement aux familles et verrouille les notes.</p>
         <div class="champ" style="max-width:360px"><label for="c-classe">Classe</label><select id="c-classe"><option value="">Choisir une classe</option></select></div>
         <div class="segment" role="group" aria-label="Semestre à clôturer">
           <button type="button" class="active" data-csem="1">1er semestre</button>
@@ -796,7 +804,7 @@
 
       <section id="panel-passage" class="panneau panneau-admin">
         <h2>🎓 Passage à l'année suivante</h2>
-        <p class="intro">À faire une fois par an, quand toutes les classes ont leur résultat annuel. Chaque élève reçoit sa classe de l'an prochain : vérifiez le résumé de chaque classe et ouvrez la liste seulement pour corriger un cas particulier.</p>
+        <p class="intro">Une fois par an, quand toutes les classes ont leur résultat annuel. Vérifiez le résumé de chaque classe.</p>
         <div id="passage-etat"></div>
         <div id="passage-contenu" hidden>
           <div class="champ" style="max-width:260px"><label for="nouvelle-annee">Nouvelle année scolaire</label><input type="text" id="nouvelle-annee" /></div>
@@ -808,15 +816,15 @@
 
       <section id="panel-gerer" class="panneau panneau-admin">
         <h2>👥 Gérer les élèves</h2>
-        <p class="intro">Un élève retiré n'apparaît plus dans les listes, mais tout son historique de notes est conservé.</p>
-        <div class="champ" style="max-width:420px"><label for="g-recherche">🔎 Rechercher un élève par son nom (toutes les classes)</label><input type="search" id="g-recherche" placeholder="Par exemple : Koffi, ou Adjovi Koffi" autocomplete="off" spellcheck="false" /></div>
+        <p class="intro">Un élève retiré sort des listes ; son historique est conservé.</p>
+        <div class="champ" style="max-width:420px"><label for="g-recherche">🔎 Rechercher un élève</label><input type="search" id="g-recherche" placeholder="Nom ou prénom, toutes classes" autocomplete="off" spellcheck="false" /></div>
         <div id="g-resultats"></div>
         <div class="champ" style="max-width:360px"><label for="g-classe">Ou choisir une classe</label><select id="g-classe"><option value="">Choisir une classe</option></select></div>
         <div id="g-liste"></div>
         <details class="corbeille" id="retires-bloc">
           <summary>↩️ Élèves retirés <span id="retires-compte" class="puce-succ">afficher</span></summary>
-          <p style="margin:4px 0 10px;color:var(--encre-2);font-size:14px">Un élève retiré par erreur, ou qui revient dans l'établissement, peut être réintégré dans une classe avec son compte et tout son historique. La liste se charge à l'ouverture (elle lit un document par élève retiré).</p>
-          <div class="champ" style="max-width:420px"><label for="retires-filtre">Filtrer par nom</label><input type="search" id="retires-filtre" autocomplete="off" spellcheck="false" /></div>
+          <p style="margin:0 0 8px;color:var(--encre-2);font-size:13.5px">À réintégrer après un retrait par erreur ou un retour (même compte, historique conservé).</p>
+          <div class="champ" style="max-width:420px"><input type="search" id="retires-filtre" placeholder="Filtrer par nom" aria-label="Filtrer les élèves retirés par nom" autocomplete="off" spellcheck="false" /></div>
           <div id="retires-liste"></div>
           <div class="statut" id="status-retires" role="status"></div>
         </details>
@@ -824,38 +832,34 @@
 
       <section id="panel-archives" class="panneau panneau-admin">
         <h2>🗂️ Archives</h2>
-        <p class="intro">Résultats des semestres et des années déjà clôturés, classe par classe. Vous pouvez y consulter le bulletin de chaque élève et télécharger un fichier Excel (résultats, notes détaillées et statistiques) à conserver, par exemple avant de mettre une vieille année à la corbeille.</p>
+        <p class="intro">Résultats clôturés, classe par classe : classements, bulletins, export Excel.</p>
         <div class="grille-form deux">
           <div class="champ"><label for="ar-annee">Année scolaire</label><select id="ar-annee"></select></div>
           <div class="champ"><label for="ar-classe">Classe</label><select id="ar-classe"></select></div>
         </div>
         <button class="btn" id="btn-voir-archives" type="button">Afficher les résultats</button>
         <div class="export-boite">
-          <span class="export-titre">⬇️ Télécharger en Excel l'année choisie :</span>
-          <button class="btn contour petit" id="btn-exporter" type="button">Seulement la classe <b id="export-classe-nom">choisie</b></button>
-          <button class="btn contour petit" id="btn-exporter-ecole" type="button">Toute l'école (toutes les classes)</button>
+          <span class="export-titre">⬇️ Excel :</span>
+          <button class="btn contour petit" id="btn-exporter" type="button" title="Télécharger la classe choisie en Excel"><b id="export-classe-nom">choisie</b></button>
+          <button class="btn contour petit" id="btn-exporter-ecole" type="button">Toute l'école</button>
         </div>
         <div class="statut" id="status-archives" role="status"></div>
         <div id="ar-bulletins" class="ar-bulletins" hidden>
           <h3>📄 Bulletin d'un élève</h3>
-          <p class="ar-aide">Le même bulletin que celui que voient l'élève et ses parents, pour l'année et la classe affichées. Il s'ouvre seul, en plein écran.</p>
-          <div class="eleve-choix">
-            <div class="champ"><label for="ar-eleve">Élève</label><select id="ar-eleve"></select></div>
-            <button class="btn" id="btn-ouvrir-bulletin" type="button" disabled>Ouvrir le bulletin</button>
-          </div>
+          <div class="champ" style="max-width:360px"><label for="ar-eleve">Choisir un élève : son bulletin s'ouvre en plein écran</label><select id="ar-eleve"></select></div>
         </div>
         <div id="ar-resultat" style="margin-top:18px"></div>
         <button class="btn danger" id="btn-corbeille" type="button" style="display:none;margin-top:16px">Mettre cette archive à la corbeille</button>
         <details class="corbeille" id="corbeille-bloc">
           <summary>🗑️ Corbeille <span id="corbeille-compte" class="puce-succ">vide</span></summary>
-          <p style="margin:4px 0 10px;color:var(--encre-2);font-size:14px">Une archive mise à la corbeille est supprimée automatiquement après 20 jours, sauf si vous la restaurez (la suppression se fait à la première connexion d'un administrateur après cette date).</p>
+          <p style="margin:0 0 8px;color:var(--encre-2);font-size:13.5px">Supprimée automatiquement après 20 jours, sauf restauration.</p>
           <div id="corbeille-liste"></div>
         </details>
       </section>
 
       <section id="panel-admin" class="panneau panneau-admin">
         <h2>🛡️ Administrateurs</h2>
-        <p class="intro">Un administrateur peut tout faire sur le portail : inscrire, noter, clôturer, supprimer. Réservez ce compte au personnel de confiance.</p>
+        <p class="intro">Un administrateur peut tout faire : réservez ce compte au personnel de confiance.</p>
         <div class="grille-form deux">
           <div class="champ"><label for="a-nom">Nom complet</label><input type="text" id="a-nom" autocomplete="off" /></div>
           <div class="champ"><label for="a-email">E-mail</label><input type="email" id="a-email" autocomplete="off" autocapitalize="none" spellcheck="false" /></div>
@@ -867,12 +871,12 @@
       <!-- Bulletin d'un élève ouvert depuis les archives : affiché seul -->
       <section id="vue-bulletin-archive" class="vue-bulletin" hidden>
         <div class="vb-barre">
-          <button class="btn contour petit" id="btn-retour-archives" type="button">← Retour aux archives</button>
-          <button class="btn contour petit" id="btn-imprimer-archive" type="button" data-imprimer>🖨️ Imprimer / PDF</button>
+          <button class="btn contour petit" id="btn-retour-archives" type="button">← Retour</button>
+          <button class="btn contour petit btn-ico" id="btn-imprimer-archive" type="button" data-imprimer title="Imprimer ou enregistrer en PDF" aria-label="Imprimer ou enregistrer en PDF">🖨️<span class="lib"> Imprimer / PDF</span></button>
           <div class="vb-nav">
-            <button class="btn contour petit" id="btn-eleve-prec" type="button" aria-label="Élève précédent">‹ Précédent</button>
+            <button class="btn contour petit btn-ico" id="btn-eleve-prec" type="button" aria-label="Élève précédent" title="Élève précédent">‹<span class="lib"> Précédent</span></button>
             <span id="vb-position" class="vb-position"></span>
-            <button class="btn contour petit" id="btn-eleve-suiv" type="button" aria-label="Élève suivant">Suivant ›</button>
+            <button class="btn contour petit btn-ico" id="btn-eleve-suiv" type="button" aria-label="Élève suivant" title="Élève suivant"><span class="lib">Suivant </span>›</button>
           </div>
         </div>
         <div class="eleve-tete">
@@ -895,12 +899,12 @@
       <p id="eleve-sous-titre"></p>
     </div>
     <div class="eleve-choix">
-      <div class="champ"><label for="e-annee-select">📅 Année scolaire</label><select id="e-annee-select"></select></div>
+      <div class="champ" id="e-annee-champ"><label for="e-annee-select">📅 Année scolaire</label><select id="e-annee-select"></select></div>
       <div class="segment" role="group" aria-label="Semestre">
         <button type="button" class="active" data-esem="1">1er semestre</button>
         <button type="button" data-esem="2">2nd semestre</button>
       </div>
-      <button class="btn contour petit btn-imprimer" id="btn-imprimer" type="button" data-imprimer>🖨️ Imprimer / PDF</button>
+      <button class="btn contour petit btn-imprimer btn-ico" id="btn-imprimer" type="button" data-imprimer title="Imprimer ou enregistrer en PDF" aria-label="Imprimer ou enregistrer en PDF">🖨️<span class="lib"> Imprimer / PDF</span></button>
     </div>
     <article class="feuille" id="feuille" aria-live="polite"></article>
     <section class="panneau panneau-classement">
@@ -1447,7 +1451,7 @@
     if (!classe || !elevesParClasse[classe]) { zone.innerHTML = classe ? "<div class='vide'>📭 Aucun élève actif dans cette classe.</div>" : ""; return; }
     zone.innerHTML = elevesParClasse[classe].map((el) =>
       "<div class='liste-ligne'><div class='quoi'><b>" + esc(el.nom) + "</b></div>" +
-      "<button class='btn danger petit' type='button' data-retirer='" + esc(el.uid) + "'>Retirer (abandon)</button></div>").join("");
+      "<button class='btn danger petit' type='button' data-retirer='" + esc(el.uid) + "'>Retirer</button></div>").join("");
     zone.querySelectorAll("[data-retirer]").forEach((btn) => btn.addEventListener("click", () => retirerEleve(btn, btn.dataset.retirer, classe)));
   }
   function retirerEleve(btn, uid, classe) {
@@ -1511,6 +1515,7 @@
   // ---- Recherche d'un élève par son nom ----
   // Elle parcourt la liste des élèves actifs déjà chargée : aucune lecture de plus dans la base.
   const sansAccent = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  let rechercheComplete = null;   // saisie pour laquelle on a demandé à voir tous les résultats
   $("g-recherche").addEventListener("input", afficherRecherche);
   function afficherRecherche() {
     const zone = $("g-resultats");
@@ -1525,12 +1530,13 @@
     }));
     if (!trouves.length) { zone.innerHTML = "<div class='vide'>Aucun élève actif ne correspond à « " + esc(saisie) + " ». Un élève retiré se trouve plus bas, dans « Élèves retirés ».</div>"; return; }
     trouves.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
-    const n = trouves.length, max = 50;
-    zone.innerHTML = "<p class='compte'>" + n + " élève" + (n > 1 ? "s trouvés" : " trouvé") + (n > max ? " : les " + max + " premiers sont affichés, précisez le nom" : "") + "</p>" +
-      trouves.slice(0, max).map((el) => "<div class='liste-ligne avec-actions'><div class='quoi'><b>" + surligner(el.nom, mots) + "</b><small>" + esc(el.classe) + "</small></div><div class='actions'>" +
-        "<button class='btn contour petit' type='button' data-r-notes='" + esc(el.uid) + "' data-classe='" + esc(el.classe) + "'>✍️ Notes</button>" +
-        "<button class='btn contour petit' type='button' data-r-bulletin='" + esc(el.uid) + "' data-classe='" + esc(el.classe) + "'>📄 Bulletin</button>" +
-        "<button class='btn danger petit' type='button' data-r-retirer='" + esc(el.uid) + "' data-classe='" + esc(el.classe) + "'>Retirer</button></div></div>").join("");
+    const n = trouves.length, max = rechercheComplete === saisie ? n : 20;
+    const bouton = (attr, cls, ico, lib, el) => "<button class='btn " + cls + " petit btn-ico' type='button' " + attr + "='" + esc(el.uid) + "' data-classe='" + esc(el.classe) + "' title='" + lib + "' aria-label='" + lib + " : " + esc(el.nom) + "'>" + ico + "<span class='lib'> " + lib + "</span></button>";
+    zone.innerHTML = "<p class='compte'>" + n + " élève" + (n > 1 ? "s trouvés" : " trouvé") + "</p>" +
+      trouves.slice(0, max).map((el) => "<div class='liste-ligne ligne-eleve'><div class='quoi'><b>" + surligner(el.nom, mots) + "</b><small>" + esc(el.classe) + "</small></div><div class='actions'>" +
+        bouton("data-r-notes", "contour", "✍️", "Notes", el) + bouton("data-r-bulletin", "contour", "📄", "Bulletin", el) + bouton("data-r-retirer", "danger", "✖", "Retirer", el) + "</div></div>").join("") +
+      (n > max ? "<button class='btn contour mini' type='button' id='btn-tout-afficher'>Afficher les " + (n - max) + " autres</button>" : "");
+    if (n > max) $("btn-tout-afficher").addEventListener("click", () => { rechercheComplete = saisie; afficherRecherche(); });
     zone.querySelectorAll("[data-r-notes]").forEach((b) => b.addEventListener("click", () => ouvrirSaisie(b.dataset.classe, b.dataset.rNotes, semestreActif)));
     zone.querySelectorAll("[data-r-bulletin]").forEach((b) => b.addEventListener("click", () => ouvrirBulletinDepuisRecherche(b.dataset.rBulletin, b.dataset.classe)));
     zone.querySelectorAll("[data-r-retirer]").forEach((b) => b.addEventListener("click", () => retirerEleve(b, b.dataset.rRetirer, b.dataset.classe)));
@@ -1601,29 +1607,28 @@
     const connu = classes.every((c) => c in etatClotures);
     const nb = (cle) => connu ? classes.filter((c) => etatClotures[c][cle]).length : null;
     const s1 = nb("s1"), an = nb("an");
-    const carte = (lib, val, ok) => "<div class='resume-carte" + (ok ? " ok" : "") + "'><span>" + lib + "</span><b>" + val + "</b></div>";
-    const sur = (n) => (n === null ? "…" : n) + " <small>/ " + classes.length + "</small>";
+    const carte = (lib, titre, val, ok) => "<div class='resume-carte" + (ok ? " ok" : "") + "' title='" + titre + "'><span>" + lib + "</span><b>" + val + "</b></div>";
+    const sur = (n) => (n === null ? "…" : n) + "<small>/" + classes.length + "</small>";
     $("resume-cartes").innerHTML =
-      carte("Élèves actifs", classes.reduce((a, c) => a + elevesParClasse[c].length, 0)) +
-      carte("Classes avec des élèves", classes.length) +
-      carte("1er semestre clôturé", sur(s1), classes.length > 0 && s1 === classes.length) +
-      carte("Résultat annuel publié", sur(an), classes.length > 0 && an === classes.length);
+      carte("Élèves", "Élèves actifs", classes.reduce((a, c) => a + elevesParClasse[c].length, 0)) +
+      carte("Classes", "Classes avec des élèves", classes.length) +
+      carte("1er sem.", "Classes ayant clôturé le 1er semestre", sur(s1), classes.length > 0 && s1 === classes.length) +
+      carte("Annuel", "Classes ayant publié le résultat annuel", sur(an), classes.length > 0 && an === classes.length);
   }
   function afficherClotures() {
     const zone = $("resume-clotures");
     const classes = classesActives();
     if (!classes.length) { zone.innerHTML = "<div class='vide'>📭 Aucun élève actif pour l'instant.</div>"; return; }
-    const etat = (st, fait, attente) => st
-      ? "<span class='etat fait'>✅ " + fait + (st.taux_reussite !== undefined ? "<small>" + st.taux_reussite + " % de réussite</small>" : "") + "</span>"
-      : "<span class='etat afaire'>⏳ " + attente + "</span>";
-    zone.innerHTML = classes.map((c) => {
-      const e = etatClotures[c] || {}, n = elevesParClasse[c].length;
-      const sem = !e.s1 ? 1 : !e.an ? 2 : 0;
-      return "<div class='liste-ligne ligne-cloture'><div class='quoi'><b>" + esc(c) + "</b><small>" + n + " élève" + (n > 1 ? "s" : "") + "</small></div>" +
-        "<div class='etats'>" + etat(e.s1, "1er semestre clôturé", "1er semestre à clôturer") +
-        etat(e.an, "2nd semestre et année publiés", e.s1 ? "2nd semestre et année à clôturer" : "2nd semestre et année (après le 1er)") + "</div>" +
-        (sem ? "<button class='btn contour petit' type='button' data-vers-cloture='" + esc(c) + "' data-vers-sem='" + sem + "'>Clôturer</button>" : "<span class='puce-succ'>Terminé</span>") + "</div>";
-    }).join("");
+    const etat = (st) => st
+      ? "<span class='puce-etat ok' title='Clôturé'>✅" + (st.taux_reussite !== undefined ? " " + st.taux_reussite + " %" : "") + "</span>"
+      : "<span class='puce-etat attente' title='À clôturer'>⏳</span>";
+    zone.innerHTML = "<table class='tableau compact'><thead><tr><th>Classe</th><th>1er sem.</th><th>Annuel</th><th></th></tr></thead><tbody>" +
+      classes.map((c) => {
+        const e = etatClotures[c] || {};
+        const sem = !e.s1 ? 1 : !e.an ? 2 : 0;
+        return "<tr><td><b>" + esc(c) + "</b><small>" + elevesParClasse[c].length + "</small></td><td>" + etat(e.s1) + "</td><td>" + etat(e.an) + "</td><td class='num'>" +
+          (sem ? "<button class='btn contour mini' type='button' data-vers-cloture='" + esc(c) + "' data-vers-sem='" + sem + "'>Clôturer</button>" : "<span class='puce-etat ok'>Terminé</span>") + "</td></tr>";
+      }).join("") + "</tbody></table>";
     zone.querySelectorAll("[data-vers-cloture]").forEach((b) => b.addEventListener("click", () => {
       choisirSemestreCloture(parseInt(b.dataset.versSem));
       $("c-classe").value = b.dataset.versCloture;
@@ -1638,6 +1643,7 @@
   async function afficherEspace(jeton) {
     const zone = $("resume-espace");
     zone.innerHTML = "<div class='squelette'><span></span><span></span></div>";
+    $("resume-espace-total").textContent = "…";
     const types = [
       ["bulletins", "Bulletins", "notes, moyennes, résultats annuels"],
       ["statistiques_classe", "Classements des classes", "un par classe et par semestre"],
@@ -1650,14 +1656,15 @@
       const ko = types.map(([col], i) => nombres[i] * TAILLE_MOYENNE_KO[col]);
       const total = ko.reduce((a, b) => a + b, 0);
       const pct = (total / STOCKAGE_GRATUIT_KO) * 100;
-      zone.innerHTML = "<p class='espace-total' style='margin:0'>Environ <b>" + taille(total) + "</b> utilisés sur 1 Go gratuit (" + (pct < 0.1 ? "moins de 0,1" : fmt(pct, 1)) + " %)</p>" +
-        "<div class='espace-barre' role='img' aria-label='" + fmt(pct, 1) + " % utilisés'><span style='width:" + Math.min(100, pct) + "%'></span></div>" +
+      $("resume-espace-total").textContent = "≈ " + taille(total) + " / 1 Go";
+      zone.innerHTML = "<div class='espace-barre' role='img' aria-label='" + fmt(pct, 1) + " % utilisés'><span style='width:" + Math.min(100, pct) + "%'></span></div>" +
+        "<p class='ar-aide' style='margin:0 0 4px'>Environ " + taille(total) + " sur 1 Go gratuit (" + (pct < 0.1 ? "moins de 0,1" : fmt(pct, 1)) + " %).</p>" +
         types.map(([, lib, detail], i) => "<div class='liste-ligne'><div class='quoi'><b>" + lib + "</b><small>" + detail + " · " +
           nombres[i].toLocaleString("fr-FR") + " document" + (nombres[i] > 1 ? "s" : "") + "</small></div><span class='espace-ko'>≈ " + taille(ko[i]) + "</span></div>").join("") +
-        "<p class='ar-aide' style='margin:10px 0 0'>Estimation : nombre réel de documents × taille moyenne mesurée. La valeur exacte se trouve dans la console Google Cloud (page Firestore), mise à jour environ une fois par jour.</p>";
+        "<p class='ar-aide' style='margin:8px 0 0'>Estimation : nombre réel de documents × taille moyenne mesurée (valeur exacte : console Google Cloud).</p>";
     } catch (e) {
       console.error("Espace utilisé :", e);
-      if (jeton === jetonResume) zone.innerHTML = "<div class='alerte'>Estimation indisponible pour le moment : " + esc(messageErreur(e)) + "</div>";
+      if (jeton === jetonResume) { zone.innerHTML = "<div class='alerte'>Estimation indisponible pour le moment : " + esc(messageErreur(e)) + "</div>"; $("resume-espace-total").textContent = "indisponible"; }
     }
   }
   $("btn-actualiser-resume").addEventListener("click", (ev) => occupe(ev.currentTarget, chargerResume));
@@ -1693,9 +1700,9 @@
         const libSem = sem === 1 ? "1er semestre" : "2nd semestre";
         if (!sansNote.length && !incomplets.length) { completes.push(c + " (" + libSem + ")"); return; }
         const ligne = (el, detail) => "<div class='liste-ligne'><div class='quoi'><button class='lien-eleve' type='button' data-saisir='" + esc(el.uid) + "' data-classe='" + esc(c) + "' data-vers-sem='" + sem + "'>" + esc(el.nom) + "</button><small>" + esc(detail) + "</small></div></div>";
-        html += "<details class='manq-classe'><summary><b>" + esc(c) + "</b><span class='puce-succ'>" + libSem + "</span>" +
-          (sansNote.length ? "<span class='puce-succ manque'>" + sansNote.length + " sans aucune note</span>" : "") +
-          (incomplets.length ? "<span class='puce-succ depart'>" + incomplets.length + " avec des matières vides</span>" : "") + "</summary>" +
+        html += "<details class='manq-classe'><summary><b>" + esc(c) + "</b><span class='puce-succ'>" + (sem === 1 ? "1er sem." : "2nd sem.") + "</span>" +
+          (sansNote.length ? "<span class='puce-succ manque' title='Élèves sans aucune note'>" + sansNote.length + " sans note</span>" : "") +
+          (incomplets.length ? "<span class='puce-succ depart' title='Élèves avec au moins une matière sans note'>" + incomplets.length + " incomplet" + (incomplets.length > 1 ? "s" : "") + "</span>" : "") + "</summary>" +
           sansNote.map((el) => ligne(el, "Aucune note")).join("") +
           incomplets.map((x) => ligne(x.el, "Sans note : " + x.vides.join(", "))).join("") + "</details>";
       });
@@ -1787,9 +1794,7 @@
     const dis = cloture ? " disabled" : "";
     let html = cloture ? "<div class='alerte'>🔒 Ce semestre est clôturé pour cet élève : les notes sont verrouillées.</div>" : "";
     if (!cloture && arriveApresS1 && semestreActif === 1) {
-      html += "<p class='info'>ℹ️ Élève arrivé après la clôture du 1er semestre : il n'a pas de rang au 1er semestre. " +
-        "Vous pouvez saisir ici ses notes du 1er semestre (par exemple celles de son ancien établissement) : elles compteront dans sa moyenne annuelle. " +
-        "Sans notes, sa moyenne annuelle sera celle du 2nd semestre.</p>";
+      html += "<p class='info'>ℹ️ Arrivé après la clôture : notes facultatives (ancien établissement), comptées dans la moyenne annuelle, sans rang.</p>";
     }
     html += "<div class='grille-scroll'><table class='grille'><thead><tr><th>Matières</th>" + EVALS.map((ev) => ev.startsWith("devoir") ? "<th class='th-dev'><span>" + EVAL_LABELS[ev] + "</span></th>" : "<th>" + EVAL_LABELS[ev] + "</th>").join("") + "</tr></thead><tbody>";
     const bareme = BAREME[classe];
@@ -1873,9 +1878,7 @@
   function noteArrivesApresS1(classe, statsS1) {
     const nouveaux = arrivesApresS1(classe, statsS1);
     if (!nouveaux.length) return "";
-    return "<p class='info' style='margin:0 0 14px'>ℹ️ Arrivé(s) après cette clôture : <b>" + nouveaux.map((el) => esc(el.nom)).join(", ") + "</b>. " +
-      "Pas de rang au 1er semestre (le classement publié ne change pas). Leurs notes du 1er semestre, si vous les saisissez, " +
-      "compteront dans la moyenne annuelle ; sinon elle sera égale à celle du 2nd semestre. Le 2nd semestre se clôture normalement.</p>";
+    return "<p class='info' style='margin:0 0 14px'>ℹ️ Arrivés après cette clôture, non classés au 1er semestre : <b>" + nouveaux.map((el) => esc(el.nom)).join(", ") + "</b>.</p>";
   }
   async function afficherEtatCloture() {
     const classe = $("c-classe").value;
@@ -2253,7 +2256,6 @@
         archiveBulletins = { annee, classe };
         $("ar-eleve").innerHTML = "<option value=''>Choisir un élève (" + noms.size + ")</option>" +
           Array.from(noms.entries()).sort((a, b) => a[1].localeCompare(b[1], "fr")).map(([u, n]) => "<option value='" + esc(u) + "'>" + esc(n) + "</option>").join("");
-        $("btn-ouvrir-bulletin").disabled = true;
         $("ar-bulletins").hidden = false;
       }
       // L'année en cours n'est jamais mise à la corbeille : ce sont les notes de l'année qui se déroule
@@ -2456,10 +2458,10 @@
       $("ar-eleve").innerHTML = retourRecherche.options;
       $("ar-eleve").value = retourRecherche.valeur;
       retourRecherche = null;
-      $("btn-retour-archives").textContent = "← Retour aux archives";
       $("g-resultats").scrollIntoView({ block: "start" });
       return;
     }
+    $("ar-eleve").value = "";   // on peut rouvrir le même élève en le choisissant de nouveau
     $("ar-bulletins").scrollIntoView({ block: "start" });
   }
   // Bulletin de l'année en cours d'un élève trouvé par la recherche (même vue plein écran que les archives,
@@ -2469,11 +2471,9 @@
     if (!retourRecherche) retourRecherche = { archive: archiveBulletins, options: $("ar-eleve").innerHTML, valeur: $("ar-eleve").value };
     archiveBulletins = { annee: ANNEE_SCOLAIRE, classe };
     $("ar-eleve").innerHTML = (elevesParClasse[classe] || []).map((el) => "<option value='" + esc(el.uid) + "'>" + esc(el.nom) + "</option>").join("");
-    $("btn-retour-archives").textContent = "← Retour à la recherche";
     ouvrirBulletinArchive(uid);
   }
-  $("ar-eleve").addEventListener("change", () => { $("btn-ouvrir-bulletin").disabled = !$("ar-eleve").value; });
-  $("btn-ouvrir-bulletin").addEventListener("click", () => ouvrirBulletinArchive($("ar-eleve").value));
+  $("ar-eleve").addEventListener("change", () => { if ($("ar-eleve").value) ouvrirBulletinArchive($("ar-eleve").value); });
   $("btn-retour-archives").addEventListener("click", fermerBulletinArchive);
   [["btn-eleve-prec", -1], ["btn-eleve-suiv", 1]].forEach(([id, pas]) => $(id).addEventListener("click", () => {
     const liste = optionsEleves(), i = liste.findIndex((o) => o.value === $("ar-eleve").value);
@@ -2581,7 +2581,7 @@
     const sel = $("e-annee-select");
     sel.innerHTML = annees.map((a) => "<option value='" + esc(a) + "'>" + esc(a) + (a === ANNEE_SCOLAIRE ? " (année en cours)" : "") + "</option>").join("");
     sel.value = ANNEE_SCOLAIRE;
-    sel.disabled = annees.length < 2;
+    $("e-annee-champ").hidden = annees.length < 2;   // une seule année : déjà écrite sous le nom
 
     let semEleve = 1;
     let anneeAffichee = ANNEE_SCOLAIRE;
@@ -2760,6 +2760,8 @@
     h += "<div class='tb-mobile'><div class='ligne m-entete'><span>Matières</span><span>Moy. /20</span></div>";
     lignes.forEach((l) => {
       h += "<div class='ligne m-l1'><span class='m-nom'>" + esc(l.mat) + "<span class='coef'>coef. " + l.coef + "</span></span><span class='m-moy'>" + neutre(l.moy, 2) + "</span></div>";
+      const vide = l.conduite ? !present(l.moy) : !l.interros.some(present) && !present(l.d1) && !present(l.d2);
+      if (vide) return;   // rien à détailler : la ligne du nom suffit
       h += l.conduite
         ? "<div class='ligne m-l2'><span class='m-det'>Note de conduite</span><span class='m-pts'>" + (present(l.points) ? fmt(l.points, 2) + " pts" : "") + "</span></div>"
         : "<div class='ligne m-l2'><span class='m-grp'><i class='lbl-int'>Int.</i>" + l.interros.map(note).join("") + "</span><span class='m-grp'><i class='lbl-dev'>Dev.</i>" + note(l.d1) + note(l.d2) + "</span><span class='m-pts'>" + (present(l.points) ? fmt(l.points, 2) + " pts" : "") + "</span></div>";
