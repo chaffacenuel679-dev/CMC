@@ -26,12 +26,17 @@ service cloud.firestore {
                     || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['expire_le']));
     }
 
-    // Classements : lisibles par les élèves qui étaient dans cette classe cette année-là,
-    // y compris pour les classements clôturés avant la mise à jour du site
+    // Classements : lisibles seulement par les élèves de cette classe CETTE année-là :
+    // - inscrits au classement (eleves_uids) ;
+    // - ou élève actif de la classe pendant l'année active (arrivé après la clôture du 1er semestre) ;
+    // - ou dont le bulletin du 1er semestre de cette année porte cette classe (classements anciens).
+    // Un élève ne voit donc ni les promotions précédentes de sa classe, ni, après son départ, la nouvelle promotion.
     match /statistiques_classe/{id} {
       allow read: if connecte() && (estAdmin() || resource == null
                   || request.auth.uid in resource.data.get('eleves_uids', [])
-                  || profil().get('classe', '') == resource.data.classe
+                  || (profil().get('statut', 'actif') != 'inactif'
+                      && profil().get('classe', '') == resource.data.classe
+                      && resource.data.get('annee_scolaire', '') == get(/databases/$(database)/documents/config/annee_active).data.valeur)
                   || get(/databases/$(database)/documents/bulletins/$(monBulletinS1(resource.data.annee_scolaire))).data.classe == resource.data.classe);
       allow write: if estAdmin();
     }

@@ -600,8 +600,12 @@
   .liste-ligne .actions select { width: auto; min-width: 140px; max-width: 200px; height: 36px; font-size: 14px; border-radius: 8px; }
   @media (max-width: 480px) { .liste-ligne.avec-actions { flex-wrap: wrap; } .liste-ligne.avec-actions .actions { width: 100%; justify-content: flex-start; } }
   .eleve-choix .btn-imprimer { margin: 0 0 16px auto; }
+  .eleve-info { margin: -6px 0 14px; }
   .ligne-eleve { padding: 8px 0; }
   .ligne-eleve .actions { flex-wrap: nowrap; flex-shrink: 0; }
+  .liste-ligne.avec-formulaire { flex-wrap: wrap; }
+  .changer-classe { flex-basis: 100%; display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+  .changer-classe select { max-width: 200px; height: 38px; font-size: 14px; }
 
   /* ---------- Impression du bulletin (et « Enregistrer en PDF ») ---------- */
   .entete-impression, .pied-impression { display: none; }
@@ -823,7 +827,7 @@
         <div id="g-liste"></div>
         <details class="corbeille" id="retires-bloc">
           <summary>↩️ Élèves retirés <span id="retires-compte" class="puce-succ">afficher</span></summary>
-          <p style="margin:0 0 8px;color:var(--encre-2);font-size:13.5px">À réintégrer après un retrait par erreur ou un retour (même compte, historique conservé).</p>
+          <p style="margin:0 0 8px;color:var(--encre-2);font-size:13.5px">Réintégration possible pendant 10 jours après le retrait (même compte, historique conservé).</p>
           <div class="champ" style="max-width:420px"><input type="search" id="retires-filtre" placeholder="Filtrer par nom" aria-label="Filtrer les élèves retirés par nom" autocomplete="off" spellcheck="false" /></div>
           <div id="retires-liste"></div>
           <div class="statut" id="status-retires" role="status"></div>
@@ -898,6 +902,7 @@
       <h1 id="eleve-titre"></h1>
       <p id="eleve-sous-titre"></p>
     </div>
+    <p class="info eleve-info" id="eleve-info" hidden>ℹ️ Vous n'êtes plus inscrit(e) au CMC : vos bulletins restent consultables.</p>
     <div class="eleve-choix">
       <div class="champ" id="e-annee-champ"><label for="e-annee-select">📅 Année scolaire</label><select id="e-annee-select"></select></div>
       <div class="segment" role="group" aria-label="Semestre">
@@ -923,7 +928,7 @@
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
   import {
     getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, deleteField, getDoc, getDocs,
-    onSnapshot, query, where, Timestamp, arrayUnion, arrayRemove, getCountFromServer
+    onSnapshot, query, where, Timestamp, arrayUnion, arrayRemove, getCountFromServer, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -1227,7 +1232,7 @@
   function tauxReussite(liste) {
     const avecMoyenne = liste.filter((x) => x.moyenne !== null);
     const admis = avecMoyenne.filter((x) => x.moyenne >= 10).length;
-    return avecMoyenne.length > 0 ? Math.round((admis / avecMoyenne.length) * 100) : 0;
+    return avecMoyenne.length > 0 ? Math.round((admis / avecMoyenne.length) * 100) : null;   // personne de classé : pas de taux
   }
 
   // Tableau de classement partagé (élève, clôture, archives). uidMoi = ligne à mettre en évidence.
@@ -1235,7 +1240,7 @@
     const classement = statsDoc.classement || [];
     const taux = statsDoc.taux_reussite;
     let html = "<div class='bloc-classement'><h3>" + esc(titre) + "</h3>";
-    if (taux !== undefined) {
+    if (taux !== undefined && taux !== null) {
       html += "<div class='taux'><div class='taux-barre'><span style='width:" + Math.max(0, Math.min(100, taux)) + "%'></span></div><span>📊 <b>" + taux + " %</b> de réussite</span></div>";
     }
     html += "<div class='tableau-scroll'><table class='tableau'><thead><tr><th>Rang</th><th>Élève</th><th class='num'>Moyenne</th>" + (avecStatut ? "<th>Statut</th>" : "") + "</tr></thead><tbody>";
@@ -1394,6 +1399,12 @@
     if (!nom || !classe || !email || !password) { showStatus("status-eleve", "Remplissez les quatre champs.", false); return; }
     const probleme = verifierIdentite(nom, email, password);
     if (probleme) { showStatus("status-eleve", probleme, false); return; }
+    // Même nom déjà inscrit (doublon par erreur, ou vrai homonyme) : on demande avant de créer
+    const cle = (t) => sansAccent(t).replace(/\s+/g, " ").trim();
+    const memes = Object.keys(elevesParClasse).filter((c) => elevesParClasse[c].some((el) => cle(el.nom) === cle(nom)));
+    if (memes.length && !confirm("Un élève du même nom est déjà inscrit : " + nom + " (" + trierClasses(memes).join(", ") + ").\n\nS'agit-il bien d'un autre élève ? « OK » crée un second compte.")) {
+      showStatus("status-eleve", "Création annulée : un élève du même nom existe déjà.", false); return;
+    }
     try {
       await creerCompteSansDeconnecter(email, password, (uid) => setDoc(doc(db, "utilisateurs", uid), { nom, role: "eleve", classe, eleve_id: uid, email, statut: "actif" }));
       showStatus("status-eleve", "Compte créé pour " + nom + " (" + classe + "). À remettre à la famille : identifiant « " + email + " », mot de passe « " + password + " ».", true);
@@ -1450,27 +1461,60 @@
     const zone = $("g-liste");
     if (!classe || !elevesParClasse[classe]) { zone.innerHTML = classe ? "<div class='vide'>📭 Aucun élève actif dans cette classe.</div>" : ""; return; }
     zone.innerHTML = elevesParClasse[classe].map((el) =>
-      "<div class='liste-ligne'><div class='quoi'><b>" + esc(el.nom) + "</b></div>" +
-      "<button class='btn danger petit' type='button' data-retirer='" + esc(el.uid) + "'>Retirer</button></div>").join("");
+      "<div class='liste-ligne ligne-eleve'><div class='quoi'><b>" + esc(el.nom) + "</b></div><div class='actions'>" +
+      "<button class='btn contour petit btn-ico' type='button' data-changer='" + esc(el.uid) + "' data-classe='" + esc(classe) + "' title='Changer de classe' aria-label='Changer de classe : " + esc(el.nom) + "'>⇄<span class='lib'> Classe</span></button>" +
+      "<button class='btn danger petit btn-ico' type='button' data-retirer='" + esc(el.uid) + "' title='Retirer' aria-label='Retirer : " + esc(el.nom) + "'>✖<span class='lib'> Retirer</span></button></div></div>").join("");
     zone.querySelectorAll("[data-retirer]").forEach((btn) => btn.addEventListener("click", () => retirerEleve(btn, btn.dataset.retirer, classe)));
+    zone.querySelectorAll("[data-changer]").forEach((btn) => btn.addEventListener("click", () => ouvrirChangementClasse(btn)));
+  }
+  // Changer un élève de classe (inscrit dans la mauvaise classe, ou changement en cours d'année).
+  // Ses notes restent attachées à lui ; ce sont les matières de la nouvelle classe qui s'appliquent.
+  function ouvrirChangementClasse(btn) {
+    const ligne = btn.closest(".liste-ligne"), uid = btn.dataset.changer, ancienne = btn.dataset.classe;
+    const deja = ligne.querySelector(".changer-classe");
+    if (deja) { deja.remove(); ligne.classList.remove("avec-formulaire"); return; }
+    const el = (elevesParClasse[ancienne] || []).find((x) => x.uid === uid);
+    if (!el) return;
+    const f = document.createElement("div");
+    f.className = "changer-classe";
+    f.innerHTML = "<select data-nouvelle-classe='" + esc(uid) + "' aria-label='Nouvelle classe de " + esc(el.nom) + "'>" +
+      ORDRE_CLASSES.map((c) => "<option value='" + esc(c) + "'" + (c === ancienne ? " selected" : "") + ">" + esc(c) + "</option>").join("") + "</select>" +
+      "<button class='btn petit' type='button' data-valider-classe='" + esc(uid) + "'>Déplacer</button>";
+    ligne.appendChild(f);
+    ligne.classList.add("avec-formulaire");
+    f.querySelector("[data-valider-classe]").addEventListener("click", (ev) => {
+      const nouvelle = f.querySelector("select").value;
+      if (nouvelle === ancienne) { f.remove(); ligne.classList.remove("avec-formulaire"); return; }
+      if (!confirm("Déplacer " + el.nom + " de " + ancienne + " en " + nouvelle + " ?\n\nSes notes déjà saisies restent attachées à l'élève ; ce sont les matières de " + nouvelle + " qui comptent.")) return;
+      occupe(ev.currentTarget, async () => {
+        try { await updateDoc(doc(db, "utilisateurs", uid), { classe: nouvelle }); }
+        catch (e) { alert(messageErreur(e)); }
+      });
+    });
   }
   function retirerEleve(btn, uid, classe) {
     const el = (elevesParClasse[classe] || []).find((x) => x.uid === uid);
-    if (!el || !confirm("Retirer " + el.nom + " ? Son historique de notes reste conservé, mais l'élève n'apparaîtra plus dans les listes actives. Vous pourrez le réintégrer depuis « Élèves retirés ».")) return;
+    if (!el || !confirm("Retirer " + el.nom + " ? Son historique de notes reste conservé, mais l'élève n'apparaîtra plus dans les listes actives. Vous pourrez le réintégrer pendant " + JOURS_REINTEGRATION + " jours depuis « Élèves retirés ».")) return;
     occupe(btn, async () => {
-      try { await updateDoc(doc(db, "utilisateurs", uid), { statut: "inactif" }); noterRetrait(uid, el.nom, classe); }
+      try { await updateDoc(doc(db, "utilisateurs", uid), { statut: "inactif", retire_le: serverTimestamp() }); noterRetrait(uid, el.nom, classe); }
       catch (e) { alert(messageErreur(e)); }
     });
   }
 
-  // ---- Élèves retirés : réintégration ----
+  // ---- Élèves retirés : réintégration possible pendant 10 jours après le retrait ----
+  const JOURS_REINTEGRATION = 10, JOUR_MS = 24 * 60 * 60 * 1000;
+  const dateRetrait = (el) => el.retire_le && el.retire_le.toDate ? el.retire_le.toDate() : null;
+  const joursRestants = (el) => { const d = dateRetrait(el); return d ? Math.ceil((d.getTime() + JOURS_REINTEGRATION * JOUR_MS - Date.now()) / JOUR_MS) : 0; };
   let retires = null;   // chargés à la première ouverture du bloc
   $("retires-bloc").addEventListener("toggle", async () => {
     if (!$("retires-bloc").open || retires) return;
     $("retires-liste").innerHTML = "<div class='squelette'><span></span><span></span></div>";
     try {
-      const snap = await getDocs(query(collection(db, "utilisateurs"), where("role", "==", "eleve"), where("statut", "==", "inactif")));
-      retires = snap.docs.map((d) => ({ uid: d.id, nom: d.data().nom || "", classe: d.data().classe || "", annees: d.data().historique_annees || [] }))
+      // Seuls les retraits des 10 derniers jours sont lus (une lecture par élève concerné)
+      const depuis = Timestamp.fromDate(new Date(Date.now() - JOURS_REINTEGRATION * JOUR_MS));
+      const snap = await getDocs(query(collection(db, "utilisateurs"), where("retire_le", ">=", depuis)));
+      retires = snap.docs.filter((d) => d.data().role === "eleve" && d.data().statut === "inactif")
+        .map((d) => ({ uid: d.id, nom: d.data().nom || "", classe: d.data().classe || "", retire_le: d.data().retire_le }))
         .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
       afficherRetires();
     } catch (e) { $("retires-liste").innerHTML = "<div class='alerte'>" + esc(messageErreur(e)) + "</div>"; }
@@ -1481,22 +1525,24 @@
     $("retires-compte").textContent = retires.length;
     const mots = sansAccent($("retires-filtre").value.trim()).split(/\s+/).filter(Boolean);
     const liste = retires.filter((el) => mots.every((m) => sansAccent(el.nom).includes(m)));
-    if (!retires.length) { zone.innerHTML = "<div class='vide'>📭 Aucun élève retiré.</div>"; return; }
+    if (!retires.length) { zone.innerHTML = "<div class='vide'>📭 Aucun élève retiré ces " + JOURS_REINTEGRATION + " derniers jours.</div>"; return; }
     if (!liste.length) { zone.innerHTML = "<div class='vide'>Aucun élève retiré ne correspond à ce nom.</div>"; return; }
     const max = 100;
     zone.innerHTML = (liste.length > max ? "<p class='ar-aide'>" + liste.length + " élèves : les " + max + " premiers sont affichés, filtrez par nom.</p>" : "") +
-      liste.slice(0, max).map((el) => "<div class='liste-ligne avec-actions'><div class='quoi'><b>" + esc(el.nom) + "</b><small>Dernière classe : " + esc(el.classe || "?") +
-        (el.annees.length ? " · années au CMC : " + esc(el.annees.slice().sort().join(", ")) : "") + "</small></div><div class='actions'>" +
+      liste.slice(0, max).map((el) => "<div class='liste-ligne avec-actions'><div class='quoi'><b>" + esc(el.nom) + "</b><small>" + esc(el.classe || "?") +
+        " · retiré(e) le " + (dateRetrait(el) ? dateRetrait(el).toLocaleDateString("fr-FR") : "?") + " · encore " + joursRestants(el) + " jour" + (joursRestants(el) > 1 ? "s" : "") + "</small></div><div class='actions'>" +
         "<select data-classe-retour='" + esc(el.uid) + "' aria-label='Classe de réintégration de " + esc(el.nom) + "'>" +
         ORDRE_CLASSES.map((c) => "<option value='" + esc(c) + "'" + (c === el.classe ? " selected" : "") + ">" + esc(c) + "</option>").join("") + "</select>" +
         "<button class='btn contour petit' type='button' data-reintegrer='" + esc(el.uid) + "'>Réintégrer</button></div></div>").join("");
     zone.querySelectorAll("[data-reintegrer]").forEach((btn) => btn.addEventListener("click", () => {
       const el = retires.find((x) => x.uid === btn.dataset.reintegrer);
       const classe = zone.querySelector("[data-classe-retour='" + btn.dataset.reintegrer + "']").value;
-      if (!el || !confirm("Réintégrer " + el.nom + " en " + classe + " ? L'élève retrouve son compte (même identifiant et mot de passe) et réapparaît dans les listes.")) return;
+      if (!el) return;
+      if (joursRestants(el) <= 0) { showStatus("status-retires", "Délai de " + JOURS_REINTEGRATION + " jours dépassé : " + el.nom + " ne peut plus être réintégré(e).", false); return; }
+      if (!confirm("Réintégrer " + el.nom + " en " + classe + " ? L'élève retrouve son compte (même identifiant et mot de passe) et réapparaît dans les listes.")) return;
       occupe(btn, async () => {
         try {
-          await updateDoc(doc(db, "utilisateurs", el.uid), { statut: "actif", classe });
+          await updateDoc(doc(db, "utilisateurs", el.uid), { statut: "actif", classe, retire_le: deleteField() });
           retires = retires.filter((x) => x.uid !== el.uid);
           afficherRetires();
           showStatus("status-retires", el.nom + " est réintégré(e) en " + classe + ".", true);
@@ -1507,7 +1553,7 @@
   // Un élève retiré depuis le site rejoint la liste des retirés si elle est déjà chargée
   function noterRetrait(uid, nom, classe) {
     if (!retires || retires.some((x) => x.uid === uid)) return;
-    retires.push({ uid, nom, classe, annees: [] });
+    retires.push({ uid, nom, classe, retire_le: Timestamp.fromDate(new Date()) });
     retires.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
     afficherRetires();
   }
@@ -1620,7 +1666,7 @@
     const classes = classesActives();
     if (!classes.length) { zone.innerHTML = "<div class='vide'>📭 Aucun élève actif pour l'instant.</div>"; return; }
     const etat = (st) => st
-      ? "<span class='puce-etat ok' title='Clôturé'>✅" + (st.taux_reussite !== undefined ? " " + st.taux_reussite + " %" : "") + "</span>"
+      ? "<span class='puce-etat ok' title='Clôturé'>✅" + (present(st.taux_reussite) ? " " + st.taux_reussite + " %" : "") + "</span>"
       : "<span class='puce-etat attente' title='À clôturer'>⏳</span>";
     zone.innerHTML = "<table class='tableau compact'><thead><tr><th>Classe</th><th>1er sem.</th><th>Annuel</th><th></th></tr></thead><tbody>" +
       classes.map((c) => {
@@ -1802,12 +1848,12 @@
       html += "<tr><td>" + esc(mat) + "<small>coef. " + bareme[mat] + "</small></td>";
       EVALS.forEach((ev) => {
         const v = notes[mat] && present(notes[mat][ev]) ? notes[mat][ev] : "";
-        html += "<td" + (ev.startsWith("devoir") ? " class='td-dev'" : "") + "><input type='text' inputmode='decimal' autocomplete='off' id='g_" + mi + "_" + ev + "' value='" + (v === "" ? "" : fmtNote(v)) + "' aria-label='" + esc(mat + " " + EVAL_LABELS[ev]) + "'" + dis + " /></td>";
+        html += "<td" + (ev.startsWith("devoir") ? " class='td-dev'" : "") + "><input type='text' inputmode='decimal' autocomplete='off' id='g_" + mi + "_" + ev + "' value='" + (v === "" ? "" : fmtNote(v)) + "' data-orig='" + v + "' aria-label='" + esc(mat + " " + EVAL_LABELS[ev]) + "'" + dis + " /></td>";
       });
       html += "</tr>";
     });
     const cv = notes["Conduite"] && present(notes["Conduite"].valeur) ? notes["Conduite"].valeur : "";
-    html += "<tr><td>Conduite<small>coef. " + bareme["Conduite"] + "</small></td><td><input type='text' inputmode='decimal' autocomplete='off' id='g_conduite' value='" + (cv === "" ? "" : fmtNote(cv)) + "' aria-label='Note de conduite'" + dis + " /></td><td colspan='4'></td></tr>";
+    html += "<tr><td>Conduite<small>coef. " + bareme["Conduite"] + "</small></td><td><input type='text' inputmode='decimal' autocomplete='off' id='g_conduite' value='" + (cv === "" ? "" : fmtNote(cv)) + "' data-orig='" + cv + "' aria-label='Note de conduite'" + dis + " /></td><td colspan='4'></td></tr>";
     html += "</tbody></table></div>";
     container.innerHTML = html;
     $("btn-save-grille").disabled = cloture;
@@ -1829,21 +1875,28 @@
     const classe = $("n-classe").value;
     if (!eleveSelectionne || !classe) { showStatus("status-note", "Choisissez une classe et un élève.", false); return; }
     if (!$("g_conduite")) return;
-    const notes = {};
+    // Seules les cases modifiées depuis l'ouverture de la grille sont envoyées (fusion dans le bulletin) :
+    // si un autre poste a enregistré d'autres notes de cet élève entre-temps, elles ne sont pas écrasées.
+    const notes = {}, modifiees = [];
     let erreurs = 0;
-    matieresAcademiques(classe).forEach((mat, mi) => {
-      notes[mat] = {};
-      EVALS.forEach((e) => { const r = lireCase($("g_" + mi + "_" + e)); if (r.erreur) erreurs++; else notes[mat][e] = r.v; });
-    });
-    const rc = lireCase($("g_conduite"));
-    if (rc.erreur) erreurs++;
-    notes["Conduite"] = { valeur: rc.erreur ? null : rc.v };
+    const comparer = (input, mat, champ) => {
+      const r = lireCase(input);
+      if (r.erreur) { erreurs++; return; }
+      const avant = input.dataset.orig === "" ? null : Number(input.dataset.orig);
+      if (r.v === avant) return;
+      (notes[mat] = notes[mat] || {})[champ] = r.v === null ? deleteField() : r.v;
+      modifiees.push([input, r.v]);
+    };
+    matieresAcademiques(classe).forEach((mat, mi) => EVALS.forEach((e) => comparer($("g_" + mi + "_" + e), mat, e)));
+    comparer($("g_conduite"), "Conduite", "valeur");
     if (erreurs) { showStatus("status-note", erreurs + " case(s) invalide(s), encadrée(s) en rouge : une note est un nombre de 0 à 20, avec au plus 2 chiffres après la virgule (exemples : 12 ; 12,5 ; 12,75). Pas de lettre, de signe ni d'espace.", false); return; }
     const nom = $("n-eleve").selectedOptions[0].textContent;
+    if (!modifiees.length) { grilleModifiee = false; showStatus("status-note", "Aucune modification à enregistrer pour " + nom + ".", true); return; }
     try {
       await setDoc(doc(db, "bulletins", idBulletin(eleveSelectionne, semestreActif)), {
-        eleve_id: eleveSelectionne, classe, semestre: semestreActif, annee_scolaire: ANNEE_SCOLAIRE, notes, cloture: false
-      });
+        eleve_id: eleveSelectionne, classe, semestre: semestreActif, annee_scolaire: ANNEE_SCOLAIRE, notes, cloture: false, maj_le: serverTimestamp()
+      }, { merge: true });
+      modifiees.forEach(([input, v]) => { input.dataset.orig = v === null ? "" : v; });   // nouvelle base pour le prochain enregistrement
       grilleModifiee = false;
       showStatus("status-note", "Notes de " + nom + " enregistrées (" + (semestreActif === 1 ? "1er" : "2nd") + " semestre).", true);
     } catch (e) { showStatus("status-note", messageErreur(e), false); }
@@ -1926,14 +1979,20 @@
     const eleves = elevesParClasse[classe] || [];
     if (eleves.length === 0) { showStatus("status-cloture", "Aucun élève actif dans cette classe.", false); return; }
     const libelle = semestreCloture === 1 ? "le 1er semestre" : "le 2nd semestre et le résultat annuel";
-    if (!confirm("Clôturer " + libelle + " de " + classe + " (" + eleves.length + " élèves) ? Les notes seront verrouillées et le classement publié aux familles.")) return;
+    // Confirmation après la lecture des notes : la clôture est définitive, on signale les élèves sans aucune note
+    const confirmer = (sansNote) => {
+      const ok = confirm("Clôturer " + libelle + " de " + classe + " (" + eleves.length + " élèves) ? Les notes seront verrouillées et le classement publié aux familles." +
+        (sansNote.length ? "\n\n⚠️ " + sansNote.length + " élève(s) sans aucune note " + (semestreCloture === 1 ? "à ce semestre" : "au 2nd semestre") + " : ils ne seront pas classés" + (semestreCloture === 2 ? " et seront « Non admis »" : "") + ".\n" + sansNote.join(", ") : ""));
+      if (!ok) cacherStatus("status-cloture");
+      return ok;
+    };
     try {
-      if (semestreCloture === 1) await cloturerS1(classe, bareme, eleves);
-      else await cloturerS2(classe, bareme, eleves);
+      if (semestreCloture === 1) await cloturerS1(classe, bareme, eleves, confirmer);
+      else await cloturerS2(classe, bareme, eleves, confirmer);
     } catch (e) { console.error(e); showStatus("status-cloture", messageErreur(e) + " La clôture a été interrompue : relancez-la, les élèves déjà traités seront conservés.", false); }
   }).then(() => afficherEtatCloture()));
 
-  async function cloturerS1(classe, bareme, eleves) {
+  async function cloturerS1(classe, bareme, eleves, confirmer) {
     showStatus("status-cloture", "Lecture des notes…", true);
     const lignes = [];
     for (const el of eleves) {
@@ -1951,6 +2010,7 @@
       return { uid: l.el.uid, nom: l.el.nom, moyenne: moy !== null ? parseFloat(moy.toFixed(3)) : null, data: l.data };
     });
     liste = classerAvecEgalites(liste);
+    if (!confirmer(liste.filter((x) => x.moyenne === null).map((x) => x.nom))) return;
     let n = 0;
     for (const item of liste) {
       n++;
@@ -1970,7 +2030,7 @@
     showStatus("status-cloture", "1er semestre clôturé pour " + classe + ". Le classement est visible par les familles.", true);
   }
 
-  async function cloturerS2(classe, bareme, eleves) {
+  async function cloturerS2(classe, bareme, eleves, confirmer) {
     showStatus("status-cloture", "Lecture des notes…", true);
     // C'est la clôture de la CLASSE au 1er semestre qui compte : un élève arrivé après n'a pas
     // de 1er semestre clôturé, et il ne doit pas bloquer toute la classe.
@@ -1995,6 +2055,7 @@
       return { uid: l.el.uid, nom: l.el.nom, moyenne: moy !== null ? parseFloat(moy.toFixed(3)) : null, d1: l.d1, d2: l.d2 };
     });
     listeS2 = classerAvecEgalites(listeS2);
+    if (!confirmer(listeS2.filter((x) => x.moyenne === null).map((x) => x.nom))) return;
     let listeAnnuel = [];
     let n = 0;
     for (const item of listeS2) {
@@ -2169,10 +2230,10 @@
 
   $("btn-confirmer-passage").addEventListener("click", (ev) => occupe(ev.currentTarget, async () => {
     const nouvelleAnnee = $("nouvelle-annee").value.trim();
-    const nv = nouvelleAnnee.match(/^(\d{4})-(\d{4})$/), act = ANNEE_SCOLAIRE.match(/^(\d{4})-(\d{4})$/);
-    if (!nv || +nv[2] !== +nv[1] + 1) { showStatus("status-passage", "Indiquez la nouvelle année au format 2027-2028 (deux années qui se suivent).", false); return; }
-    // Une année identique ou plus ancienne ferait changer tous les élèves de classe sans changer d'année
-    if (act && +nv[1] <= +act[1]) { showStatus("status-passage", "La nouvelle année doit venir après l'année en cours (" + ANNEE_SCOLAIRE + ") : par exemple " + incrementerAnnee(ANNEE_SCOLAIRE) + ".", false); return; }
+    // Seule l'année qui suit est acceptée : une faute de frappe (2062-2063), la même année ou une année
+    // passée changerait l'année de toute l'école sans retour possible
+    const attendue = incrementerAnnee(ANNEE_SCOLAIRE);
+    if (nouvelleAnnee !== attendue) { showStatus("status-passage", "La nouvelle année doit être " + attendue + " (l'année qui suit " + ANNEE_SCOLAIRE + ").", false); return; }
     // Protection : on ne change pas l'année de toute l'école tant qu'une classe n'a pas son résultat annuel
     const manquantes = [];
     for (const c of classesAFairePasser()) {
@@ -2203,7 +2264,7 @@
       // historique_annees sert aussi de repère : un élève déjà passé n'est jamais traité deux fois si on relance
       const taches = selects.map((sel) => () => updateDoc(doc(db, "utilisateurs", sel.dataset.succUid),
         sel.value === DEPART
-          ? { statut: "inactif", historique_annees: arrayUnion(ANNEE_SCOLAIRE) }
+          ? { statut: "inactif", retire_le: serverTimestamp(), historique_annees: arrayUnion(ANNEE_SCOLAIRE) }
           : { classe: sel.value, historique_annees: arrayUnion(ANNEE_SCOLAIRE) }));
       await parPaquets(taches, 20, (n, total) => showStatus("status-passage", "Passage en cours : " + n + " / " + total + " élèves…", true));
       await setDoc(doc(db, "config", "annee_active"), { valeur: nouvelleAnnee, annees_archivees: arrayUnion(ANNEE_SCOLAIRE) }, { merge: true });
@@ -2575,26 +2636,45 @@
   async function afficherBulletinEleve(uid, nom, classeActuelle) {
     $("eleve-titre").textContent = nom || "";
     $("eleve-sous-titre").textContent = "";
-    let historique = [];
-    try { const p = await getDoc(doc(db, "utilisateurs", uid)); historique = (p.exists() && p.data().historique_annees) || []; } catch (e) { console.error(e); }
-    const annees = Array.from(new Set([ANNEE_SCOLAIRE, ...historique])).sort().reverse();
+    // Ses bulletins de toutes les années, en une seule requête : ils donnent la liste de ses années
+    // (une année supprimée des archives disparaît d'elle-même) et servent ensuite à l'affichage.
+    let profil = null, parAnnee = null;
+    try {
+      const [p, q] = await Promise.all([getDoc(doc(db, "utilisateurs", uid)), getDocs(query(collection(db, "bulletins"), where("eleve_id", "==", uid)))]);
+      profil = p.exists() ? p.data() : null;
+      parAnnee = {};
+      q.forEach((d) => { const m = d.id.match(/_(\d{4}-\d{4})_(S1|S2|ANNUEL)$/); if (m) (parAnnee[m[1]] = parAnnee[m[1]] || {})[m[2]] = d.data(); });
+    } catch (e) { console.error(e); }
+    // Un ancien élève (parti ou retiré) ne voit que ses propres années, jamais l'année en cours de son ancienne classe
+    const actif = !profil || profil.statut !== "inactif";
+    $("eleve-info").hidden = actif;
+    let annees = parAnnee ? Object.keys(parAnnee) : ((profil && profil.historique_annees) || []);
+    if (actif && !annees.includes(ANNEE_SCOLAIRE)) annees.push(ANNEE_SCOLAIRE);
+    annees = Array.from(new Set(annees)).sort().reverse();
     const sel = $("e-annee-select");
     sel.innerHTML = annees.map((a) => "<option value='" + esc(a) + "'>" + esc(a) + (a === ANNEE_SCOLAIRE ? " (année en cours)" : "") + "</option>").join("");
-    sel.value = ANNEE_SCOLAIRE;
     $("e-annee-champ").hidden = annees.length < 2;   // une seule année : déjà écrite sous le nom
+    if (!annees.length) {
+      $("feuille").innerHTML = feuilleVide(1, ["📭 Aucun bulletin", "Aucun bulletin n'est enregistré pour ce compte."]);
+      $("classement-eleve").innerHTML = "";
+      return;
+    }
+    let anneeAffichee = actif ? ANNEE_SCOLAIRE : annees[0];
+    sel.value = anneeAffichee;
 
-    let semEleve = 1;
-    let anneeAffichee = ANNEE_SCOLAIRE;
-    document.querySelectorAll("[data-esem]").forEach((b) => b.classList.toggle("active", b.dataset.esem === "1"));
-    sel.onchange = () => { anneeAffichee = sel.value; render(); };
+    // Onglet le plus utile : le 2nd semestre dès qu'il a commencé (ou que l'année est terminée), sinon le 1er
+    const ongletUtile = (annee) => {
+      const c = parAnnee && parAnnee[annee];
+      return c && (c.ANNUEL || (c.S2 && (!c.S1 || c.S1.cloture === true))) ? 2 : 1;
+    };
+    let semEleve = ongletUtile(anneeAffichee);
+    const marquerOnglet = () => document.querySelectorAll("[data-esem]").forEach((b) => b.classList.toggle("active", parseInt(b.dataset.esem) === semEleve));
+    marquerOnglet();
+    sel.onchange = () => { anneeAffichee = sel.value; semEleve = ongletUtile(anneeAffichee); marquerOnglet(); render(); };
     document.querySelectorAll("[data-esem]").forEach((btn) => {
-      btn.onclick = () => {
-        document.querySelectorAll("[data-esem]").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        semEleve = parseInt(btn.dataset.esem);
-        render();
-      };
+      btn.onclick = () => { semEleve = parseInt(btn.dataset.esem); marquerOnglet(); render(); };
     });
+    const classements = {};   // classements déjà lus, par année et classe (changer d'onglet ne relit rien)
 
     async function render() {
       const jeton = ++jetonRendu;
@@ -2603,30 +2683,34 @@
       feuille.innerHTML = "<div class='squelette' aria-label='Chargement'><span></span><span></span><span></span><span></span></div>";
       zoneCl.innerHTML = "<div class='squelette' style='padding:0'><span></span><span></span></div>";
       try {
-        const [snapS1, snapS2, snapAn] = await Promise.all([
-          lire(doc(db, "bulletins", idBulletinPour(uid, 1, anneeAffichee))),
-          lire(doc(db, "bulletins", idBulletinPour(uid, 2, anneeAffichee))),
-          lire(doc(db, "bulletins", uid + "_" + anneeAffichee + "_ANNUEL"))
-        ]);
+        let d1, d2, dAn;
+        if (parAnnee) { const c = parAnnee[anneeAffichee] || {}; d1 = c.S1 || null; d2 = c.S2 || null; dAn = c.ANNUEL || null; }
+        else {   // secours si la requête de départ a échoué : lecture bulletin par bulletin
+          const [snapS1, snapS2, snapAn] = await Promise.all([
+            lire(doc(db, "bulletins", idBulletinPour(uid, 1, anneeAffichee))),
+            lire(doc(db, "bulletins", idBulletinPour(uid, 2, anneeAffichee))),
+            lire(doc(db, "bulletins", uid + "_" + anneeAffichee + "_ANNUEL"))
+          ]);
+          d1 = snapS1.exists() ? snapS1.data() : null; d2 = snapS2.exists() ? snapS2.data() : null; dAn = snapAn.exists() ? snapAn.data() : null;
+        }
         if (jeton !== jetonRendu) return;
-        const d1 = snapS1.exists() ? snapS1.data() : null;
-        const d2 = snapS2.exists() ? snapS2.data() : null;
-        const dAn = snapAn.exists() ? snapAn.data() : null;
         // Classe de l'élève CETTE année-là (et non sa classe actuelle)
         const classeAnnee = (d1 && d1.classe) || (d2 && d2.classe) || (dAn && dAn.classe) || classeActuelle;
         $("eleve-sous-titre").textContent = "Classe de " + classeAnnee + ", année " + anneeAffichee;
 
-        const [st1, st2, stA] = await Promise.all([
+        const cleCl = anneeAffichee + "|" + classeAnnee;
+        if (!classements[cleCl]) classements[cleCl] = Promise.all([
           lireStats(doc(db, "statistiques_classe", idStatsPour(classeAnnee, 1, anneeAffichee))),
           lireStats(doc(db, "statistiques_classe", idStatsPour(classeAnnee, 2, anneeAffichee))),
           lireStats(doc(db, "statistiques_classe", idStatsAnnuelPour(classeAnnee, anneeAffichee)))
-        ]);
+        ]).catch((e) => { delete classements[cleCl]; throw e; });   // une coupure ne reste pas en mémoire
+        const [st1, st2, stA] = await classements[cleCl];
         if (jeton !== jetonRendu) return;
 
         // Le 2nd semestre est ouvert quand la classe a clôturé le 1er (y compris pour un élève arrivé après)
         const s2Ouvert = (d1 && d1.cloture === true) || st1.exists() || (d2 && d2.cloture === true);
         let data = null, message = null;
-        if (!d1 && !d2 && !dAn && anneeAffichee !== ANNEE_SCOLAIRE) {
+        if (!d1 && !d2 && !dAn && anneeAffichee !== ANNEE_SCOLAIRE) {   // (secours : liste d'années tirée de l'historique)
           message = ["📭 Résultats supprimés", "Les résultats de cette année ne sont plus conservés dans les archives."];
         } else if (semEleve === 1) {
           if (d1) data = d1;
@@ -2647,7 +2731,7 @@
         // Classement : onglet 1 = 1er semestre ; onglet 2 = 1er + 2nd semestre + résultat annuel
         // (un élève arrivé après la clôture du 1er semestre peut ne pas avoir accès à ce classement-là)
         const refus = [d1 ? st1 : null, st2, stA].some((x) => x && x.refuse);
-        if (refus) console.warn("Lecture d'un classement refusée par les règles Firestore : vérifiez que les règles v3 sont publiées.");
+        if (refus) console.warn("Lecture d'un classement refusée par les règles Firestore : vérifiez que les règles v4 sont publiées.");
         let html = "";
         if (st1.exists()) html += construireTableClassement("1er semestre", st1.data(), false, uid);
         if (semEleve === 2 && (st1.exists() || st2.exists())) {
@@ -2687,7 +2771,7 @@
     const cellule = (v) => v
       ? "<span class='" + clsNote(v.moy) + "'>" + fmt(v.moy, 3) + "</span>" + (v.rang ? "<small class='rang-petit'>" + rangTexte(v.rang) + "</small>" : "")
       : "<span class='vide-n'>—</span>";
-    const tx = (st, lib) => "<span class='taux-puce'>" + lib + " <b>" + (st && st.taux_reussite !== undefined ? st.taux_reussite + " %" : "—") + "</b></span>";
+    const tx = (st, lib) => "<span class='taux-puce'>" + lib + " <b>" + (st && present(st.taux_reussite) ? st.taux_reussite + " %" : "—") + "</b></span>";
     let h = "<div class='bloc-classement'><h3>Récapitulatif de la classe</h3>" +
       "<div class='taux-ligne'>📊 Réussite : " + tx(s1, "Semestre 1") + tx(s2, "Semestre 2") + tx(an, "Année") + "</div>" +
       "<div class='tableau-scroll'><table class='tableau recap'><thead><tr><th>Rang</th><th>Élève</th><th class='num'><span class='l'>Semestre 1</span><span class='c'>S1</span></th><th class='num'><span class='l'>Semestre 2</span><span class='c'>S2</span></th><th class='num'><span class='l'>Annuelle</span><span class='c'>Année</span></th>" + (an ? "<th class='col-statut'>Statut</th>" : "") + "</tr></thead><tbody>";
@@ -2741,7 +2825,8 @@
   function construireFeuille(data, classe, sem, stats, bulletinAnnuel) {
     const cloture = data.cloture === true;
     const { lignes, totalCoef, totalPoints } = lignesBulletin(classe, data.notes || {});
-    let h = "<div class='ligne f-titre'><h2>" + titreSemestre(sem) + "</h2><span class='puce " + (cloture ? "cloture'>🔒 Clôturé" : "encours'>✏️ En cours") + "</span></div>";
+    const maj = !cloture && data.maj_le && data.maj_le.toDate ? data.maj_le.toDate().toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : "";
+    let h = "<div class='ligne f-titre'><h2>" + titreSemestre(sem) + "</h2><span class='puce " + (cloture ? "cloture'>🔒 Clôturé" : "encours'" + (maj ? " title='Dernière mise à jour des notes le " + maj + "'" : "") + ">✏️ En cours" + (maj ? " · " + maj : "")) + "</span></div>";
 
     // --- Ordinateur / tablette : tableau complet ---
     h += "<div class='tb-large'><table class='bulletin'><thead><tr><th class='g'>Matières</th><th>Coef.</th><th class='int'>Interrogations</th><th>Moy. int.</th><th class='th-dev'><span>Dev. 1</span></th><th class='th-dev'><span>Dev. 2</span></th><th class='fort'>Moy. /20</th><th>Points</th></tr></thead><tbody>";
