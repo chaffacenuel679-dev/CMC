@@ -283,6 +283,15 @@
   .ar-bulletins { margin-top: 22px; padding-top: 18px; border-top: 1.5px dashed var(--trait); }
   .ar-bulletins h3 { margin-top: 0 !important; }
   .ar-aide { margin: -4px 0 12px; font-size: 14px; color: var(--encre-2); }
+  .ar-bulletins .eleve-choix .btn { margin-bottom: 16px; }
+  /* Bulletin ouvert depuis les archives : seul à l'écran (menu et autres panneaux masqués) */
+  #vue-admin.mode-bulletin .nav, #vue-admin.mode-bulletin .panneau-admin { display: none !important; }
+  @media (min-width: 960px) { #vue-admin.mode-bulletin { grid-template-columns: 1fr; } }
+  .vue-bulletin { max-width: 920px; margin: 0 auto; }
+  .vb-barre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+  .vb-nav { display: flex; align-items: center; gap: 8px; }
+  .vb-position { font-size: 13.5px; color: var(--encre-2); min-width: 56px; text-align: center; }
+  .vue-bulletin .segment { margin: 0 0 16px; }
   .corbeille { margin-top: 26px; border: 1px solid var(--trait); border-radius: 12px; background: var(--feuille); }
   .corbeille > summary { cursor: pointer; padding: 12px 14px; font-family: var(--titre); font-weight: 700; font-size: 16px; list-style: none; display: flex; align-items: center; gap: 10px; }
   .corbeille > summary::-webkit-details-marker { display: none; }
@@ -724,15 +733,11 @@
         <div class="statut" id="status-archives" role="status"></div>
         <div id="ar-bulletins" class="ar-bulletins" hidden>
           <h3>📄 Bulletin d'un élève</h3>
-          <p class="ar-aide">Le même bulletin que celui que voient l'élève et ses parents, pour l'année et la classe affichées.</p>
+          <p class="ar-aide">Le même bulletin que celui que voient l'élève et ses parents, pour l'année et la classe affichées. Il s'ouvre seul, en plein écran.</p>
           <div class="eleve-choix">
             <div class="champ"><label for="ar-eleve">Élève</label><select id="ar-eleve"></select></div>
-            <div class="segment" role="group" aria-label="Semestre du bulletin">
-              <button type="button" class="active" data-arsem="1">1er semestre</button>
-              <button type="button" data-arsem="2">2nd semestre</button>
-            </div>
+            <button class="btn" id="btn-ouvrir-bulletin" type="button" disabled>Ouvrir le bulletin</button>
           </div>
-          <article class="feuille" id="ar-feuille" hidden></article>
         </div>
         <div id="ar-resultat" style="margin-top:18px"></div>
         <button class="btn danger" id="btn-corbeille" type="button" style="display:none;margin-top:16px">Mettre cette archive à la corbeille</button>
@@ -753,6 +758,26 @@
         </div>
         <button class="btn" id="btn-create-admin" type="button">Créer le compte administrateur</button>
         <div class="statut" id="status-admin" role="status"></div>
+      </section>
+      <!-- Bulletin d'un élève ouvert depuis les archives : affiché seul -->
+      <section id="vue-bulletin-archive" class="vue-bulletin" hidden>
+        <div class="vb-barre">
+          <button class="btn contour petit" id="btn-retour-archives" type="button">← Retour aux archives</button>
+          <div class="vb-nav">
+            <button class="btn contour petit" id="btn-eleve-prec" type="button" aria-label="Élève précédent">‹ Précédent</button>
+            <span id="vb-position" class="vb-position"></span>
+            <button class="btn contour petit" id="btn-eleve-suiv" type="button" aria-label="Élève suivant">Suivant ›</button>
+          </div>
+        </div>
+        <div class="eleve-tete">
+          <h1 id="vb-nom"></h1>
+          <p id="vb-sous-titre"></p>
+        </div>
+        <div class="segment" role="group" aria-label="Semestre du bulletin">
+          <button type="button" class="active" data-arsem="1">1er semestre</button>
+          <button type="button" data-arsem="2">2nd semestre</button>
+        </div>
+        <article class="feuille" id="ar-feuille"></article>
       </section>
     </main>
   </div>
@@ -1750,8 +1775,7 @@
         archiveBulletins = { annee, classe };
         $("ar-eleve").innerHTML = "<option value=''>Choisir un élève (" + noms.size + ")</option>" +
           Array.from(noms.entries()).sort((a, b) => a[1].localeCompare(b[1], "fr")).map(([u, n]) => "<option value='" + esc(u) + "'>" + esc(n) + "</option>").join("");
-        $("ar-feuille").hidden = true;
-        $("ar-feuille").innerHTML = "";
+        $("btn-ouvrir-bulletin").disabled = true;
         $("ar-bulletins").hidden = false;
       }
       if (uids.size > 0) { btnCorbeille.style.display = "inline-flex"; }
@@ -1902,10 +1926,9 @@
   async function afficherBulletinArchive() {
     const uid = $("ar-eleve").value;
     const feuille = $("ar-feuille");
-    if (!uid || !archiveBulletins) { feuille.hidden = true; feuille.innerHTML = ""; return; }
+    if (!uid || !archiveBulletins) { feuille.innerHTML = ""; return; }
     const { annee, classe } = archiveBulletins;
     const jeton = ++jetonArchive;
-    feuille.hidden = false;
     feuille.innerHTML = "<div class='squelette' aria-label='Chargement'><span></span><span></span><span></span><span></span></div>";
     try {
       const [b1, b2, bA] = await Promise.all([
@@ -1917,13 +1940,42 @@
       const classeAnnee = (d1 && d1.classe) || (d2 && d2.classe) || (dAn && dAn.classe) || classe;
       const st = await lire(doc(db, "statistiques_classe", idStatsPour(classeAnnee, semArchive, annee)));
       if (jeton !== jetonArchive) return;
+      $("vb-sous-titre").textContent = "Classe de " + classeAnnee + ", année " + annee;
       const data = semArchive === 1 ? d1 : d2;
       feuille.innerHTML = data
         ? construireFeuille(data, classeAnnee, semArchive, st.exists() ? st.data() : null, semArchive === 2 ? dAn : null)
         : feuilleVide(semArchive, ["📭 Aucun bulletin", "Aucune note n'est enregistrée pour ce semestre."]);
     } catch (e) { if (jeton === jetonArchive) feuille.innerHTML = "<div class='alerte'>" + esc(messageErreur(e)) + "</div>"; }
   }
-  $("ar-eleve").addEventListener("change", afficherBulletinArchive);
+  // Ouverture / fermeture de la section dédiée
+  const optionsEleves = () => Array.from($("ar-eleve").options).filter((o) => o.value);
+  function ouvrirBulletinArchive(uid) {
+    if (!uid || !archiveBulletins) return;
+    $("ar-eleve").value = uid;
+    const liste = optionsEleves(), i = liste.findIndex((o) => o.value === uid);
+    $("vb-nom").textContent = liste[i] ? liste[i].textContent : "";
+    $("vb-sous-titre").textContent = "Classe de " + archiveBulletins.classe + ", année " + archiveBulletins.annee;
+    $("vb-position").textContent = (i + 1) + " / " + liste.length;
+    $("btn-eleve-prec").disabled = i <= 0;
+    $("btn-eleve-suiv").disabled = i >= liste.length - 1;
+    $("vue-admin").classList.add("mode-bulletin");
+    $("vue-bulletin-archive").hidden = false;
+    window.scrollTo(0, 0);
+    afficherBulletinArchive();
+  }
+  function fermerBulletinArchive() {
+    $("vue-admin").classList.remove("mode-bulletin");
+    $("vue-bulletin-archive").hidden = true;
+    $("ar-feuille").innerHTML = "";
+    $("ar-bulletins").scrollIntoView({ block: "start" });
+  }
+  $("ar-eleve").addEventListener("change", () => { $("btn-ouvrir-bulletin").disabled = !$("ar-eleve").value; });
+  $("btn-ouvrir-bulletin").addEventListener("click", () => ouvrirBulletinArchive($("ar-eleve").value));
+  $("btn-retour-archives").addEventListener("click", fermerBulletinArchive);
+  [["btn-eleve-prec", -1], ["btn-eleve-suiv", 1]].forEach(([id, pas]) => $(id).addEventListener("click", () => {
+    const liste = optionsEleves(), i = liste.findIndex((o) => o.value === $("ar-eleve").value);
+    if (liste[i + pas]) ouvrirBulletinArchive(liste[i + pas].value);
+  }));
   document.querySelectorAll("[data-arsem]").forEach((btn) => btn.addEventListener("click", () => {
     document.querySelectorAll("[data-arsem]").forEach((b) => b.classList.toggle("active", b === btn));
     semArchive = parseInt(btn.dataset.arsem);
