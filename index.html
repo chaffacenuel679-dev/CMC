@@ -299,6 +299,8 @@
   .corbeille[open] > summary::after { transform: rotate(90deg); }
   .corbeille > p, .corbeille > #corbeille-liste { margin-left: 14px !important; margin-right: 14px !important; }
   .corbeille > #corbeille-liste { padding-bottom: 12px; }
+  #retires-bloc > .champ, #retires-bloc > #retires-liste, #retires-bloc > .statut { margin-left: 14px; margin-right: 14px; }
+  #retires-bloc > #retires-liste { padding-bottom: 12px; }
   .passage { margin-top: 26px; padding-top: 22px; border-top: 1.5px dashed var(--trait); }
   .succ-groupe { margin: 12px 0; border: 1px solid var(--trait); border-radius: 12px; overflow: hidden; background: var(--feuille); }
   .succ-groupe.attention { border-color: #E8A33D; box-shadow: 0 0 0 3px rgba(232,163,61,.15); }
@@ -588,6 +590,7 @@
   .resultats-recherche .compte { margin: 0 0 4px; font-size: 13px; color: var(--encre-2); }
   .resultats-recherche mark { background: #FFE9A8; color: inherit; border-radius: 3px; padding: 0 1px; }
   .liste-ligne .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .liste-ligne .actions select { width: auto; min-width: 140px; max-width: 200px; height: 36px; font-size: 14px; border-radius: 8px; }
   @media (max-width: 480px) { .liste-ligne.avec-actions { flex-wrap: wrap; } .liste-ligne.avec-actions .actions { width: 100%; justify-content: flex-start; } }
   .eleve-choix .btn-imprimer { margin: 0 0 16px auto; }
 
@@ -675,6 +678,7 @@
         <div class="installer" id="installer" hidden>
           <button type="button" class="btn contour plein" id="btn-installer">📲 Installer l'application</button>
         </div>
+        <p class="installer-ios" id="installer-android" hidden>📲 <b>Pour installer l'application</b> (si ce n'est pas déjà fait) : dans Chrome, touchez le menu <b>⋮</b> en haut à droite, puis <b>« Installer l'application »</b>. Si Chrome demande de choisir, prenez <b>« Installer »</b> et non « Créer un raccourci ».</p>
         <p class="installer-ios" id="installer-ios" hidden>📲 <b>Sur iPhone</b>, installez l'application : touchez <b>Partager</b> <span aria-hidden="true">⎋</span> en bas de Safari, puis <b>« Sur l'écran d'accueil »</b>.</p>
         <p class="pied">🔒 Pour votre sécurité, fermer l'onglet ou le navigateur vous déconnecte.<br>Identifiants perdus ? Adressez-vous au secrétariat du CMC.</p>
       </form>
@@ -809,6 +813,13 @@
         <div id="g-resultats"></div>
         <div class="champ" style="max-width:360px"><label for="g-classe">Ou choisir une classe</label><select id="g-classe"><option value="">Choisir une classe</option></select></div>
         <div id="g-liste"></div>
+        <details class="corbeille" id="retires-bloc">
+          <summary>↩️ Élèves retirés <span id="retires-compte" class="puce-succ">afficher</span></summary>
+          <p style="margin:4px 0 10px;color:var(--encre-2);font-size:14px">Un élève retiré par erreur, ou qui revient dans l'établissement, peut être réintégré dans une classe avec son compte et tout son historique. La liste se charge à l'ouverture (elle lit un document par élève retiré).</p>
+          <div class="champ" style="max-width:420px"><label for="retires-filtre">Filtrer par nom</label><input type="search" id="retires-filtre" autocomplete="off" spellcheck="false" /></div>
+          <div id="retires-liste"></div>
+          <div class="statut" id="status-retires" role="status"></div>
+        </details>
       </section>
 
       <section id="panel-archives" class="panneau panneau-admin">
@@ -1152,6 +1163,10 @@
         if (avant !== ANNEE_SCOLAIRE && session && session.profil.role === "eleve") {
           afficherBulletinEleve(session.uid, session.profil.nom, session.profil.classe);
         }
+        if (avant !== ANNEE_SCOLAIRE && session && session.profil.role === "admin") {
+          etatClotures = {}; resumeCharge = false;
+          if (resumeActif()) chargerResume();
+        }
       }, (err) => {
         console.error("Lecture de l'année active impossible :", err);
         if (premier) { premier = false; resolve(); }
@@ -1259,6 +1274,7 @@
   // Déconnexion : la page est rechargée pour repartir de zéro (écran de connexion puis première page,
   // et aucune donnée de la personne précédente ne reste en mémoire)
   $("btn-deconnexion").addEventListener("click", () => {
+    if (!abandonnerSaisie()) return;
     arreterEcouteurs(); session = null;
     signOut(auth).finally(() => location.reload());
   });
@@ -1436,11 +1452,60 @@
   }
   function retirerEleve(btn, uid, classe) {
     const el = (elevesParClasse[classe] || []).find((x) => x.uid === uid);
-    if (!el || !confirm("Retirer " + el.nom + " ? Son historique de notes reste conservé, mais l'élève n'apparaîtra plus dans les listes actives.")) return;
+    if (!el || !confirm("Retirer " + el.nom + " ? Son historique de notes reste conservé, mais l'élève n'apparaîtra plus dans les listes actives. Vous pourrez le réintégrer depuis « Élèves retirés ».")) return;
     occupe(btn, async () => {
-      try { await updateDoc(doc(db, "utilisateurs", uid), { statut: "inactif" }); }
+      try { await updateDoc(doc(db, "utilisateurs", uid), { statut: "inactif" }); noterRetrait(uid, el.nom, classe); }
       catch (e) { alert(messageErreur(e)); }
     });
+  }
+
+  // ---- Élèves retirés : réintégration ----
+  let retires = null;   // chargés à la première ouverture du bloc
+  $("retires-bloc").addEventListener("toggle", async () => {
+    if (!$("retires-bloc").open || retires) return;
+    $("retires-liste").innerHTML = "<div class='squelette'><span></span><span></span></div>";
+    try {
+      const snap = await getDocs(query(collection(db, "utilisateurs"), where("role", "==", "eleve"), where("statut", "==", "inactif")));
+      retires = snap.docs.map((d) => ({ uid: d.id, nom: d.data().nom || "", classe: d.data().classe || "", annees: d.data().historique_annees || [] }))
+        .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+      afficherRetires();
+    } catch (e) { $("retires-liste").innerHTML = "<div class='alerte'>" + esc(messageErreur(e)) + "</div>"; }
+  });
+  $("retires-filtre").addEventListener("input", () => { if (retires) afficherRetires(); });
+  function afficherRetires() {
+    const zone = $("retires-liste");
+    $("retires-compte").textContent = retires.length;
+    const mots = sansAccent($("retires-filtre").value.trim()).split(/\s+/).filter(Boolean);
+    const liste = retires.filter((el) => mots.every((m) => sansAccent(el.nom).includes(m)));
+    if (!retires.length) { zone.innerHTML = "<div class='vide'>📭 Aucun élève retiré.</div>"; return; }
+    if (!liste.length) { zone.innerHTML = "<div class='vide'>Aucun élève retiré ne correspond à ce nom.</div>"; return; }
+    const max = 100;
+    zone.innerHTML = (liste.length > max ? "<p class='ar-aide'>" + liste.length + " élèves : les " + max + " premiers sont affichés, filtrez par nom.</p>" : "") +
+      liste.slice(0, max).map((el) => "<div class='liste-ligne avec-actions'><div class='quoi'><b>" + esc(el.nom) + "</b><small>Dernière classe : " + esc(el.classe || "?") +
+        (el.annees.length ? " · années au CMC : " + esc(el.annees.slice().sort().join(", ")) : "") + "</small></div><div class='actions'>" +
+        "<select data-classe-retour='" + esc(el.uid) + "' aria-label='Classe de réintégration de " + esc(el.nom) + "'>" +
+        ORDRE_CLASSES.map((c) => "<option value='" + esc(c) + "'" + (c === el.classe ? " selected" : "") + ">" + esc(c) + "</option>").join("") + "</select>" +
+        "<button class='btn contour petit' type='button' data-reintegrer='" + esc(el.uid) + "'>Réintégrer</button></div></div>").join("");
+    zone.querySelectorAll("[data-reintegrer]").forEach((btn) => btn.addEventListener("click", () => {
+      const el = retires.find((x) => x.uid === btn.dataset.reintegrer);
+      const classe = zone.querySelector("[data-classe-retour='" + btn.dataset.reintegrer + "']").value;
+      if (!el || !confirm("Réintégrer " + el.nom + " en " + classe + " ? L'élève retrouve son compte (même identifiant et mot de passe) et réapparaît dans les listes.")) return;
+      occupe(btn, async () => {
+        try {
+          await updateDoc(doc(db, "utilisateurs", el.uid), { statut: "actif", classe });
+          retires = retires.filter((x) => x.uid !== el.uid);
+          afficherRetires();
+          showStatus("status-retires", el.nom + " est réintégré(e) en " + classe + ".", true);
+        } catch (e) { showStatus("status-retires", messageErreur(e), false); }
+      });
+    }));
+  }
+  // Un élève retiré depuis le site rejoint la liste des retirés si elle est déjà chargée
+  function noterRetrait(uid, nom, classe) {
+    if (!retires || retires.some((x) => x.uid === uid)) return;
+    retires.push({ uid, nom, classe, annees: [] });
+    retires.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+    afficherRetires();
   }
 
   // ---- Recherche d'un élève par son nom ----
@@ -1458,7 +1523,7 @@
       const nom = sansAccent(el.nom);
       if (mots.every((m) => nom.includes(m))) trouves.push({ uid: el.uid, nom: el.nom, classe });
     }));
-    if (!trouves.length) { zone.innerHTML = "<div class='vide'>Aucun élève actif ne correspond à « " + esc(saisie) + " ». Les élèves retirés ne sont pas cherchés.</div>"; return; }
+    if (!trouves.length) { zone.innerHTML = "<div class='vide'>Aucun élève actif ne correspond à « " + esc(saisie) + " ». Un élève retiré se trouve plus bas, dans « Élèves retirés ».</div>"; return; }
     trouves.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
     const n = trouves.length, max = 50;
     zone.innerHTML = "<p class='compte'>" + n + " élève" + (n > 1 ? "s trouvés" : " trouvé") + (n > max ? " : les " + max + " premiers sont affichés, précisez le nom" : "") + "</p>" +
@@ -1482,6 +1547,7 @@
   }
   // Ouvre la saisie des notes d'un élève (depuis la recherche ou le résumé)
   function ouvrirSaisie(classe, uid, sem) {
+    if (!abandonnerSaisie()) return;
     document.querySelectorAll("#panel-notes [data-sem]").forEach((b) => b.classList.toggle("active", parseInt(b.dataset.sem) === sem));
     semestreActif = sem;
     document.querySelector(".nav-item[data-tab='notes']").click();
@@ -1641,7 +1707,21 @@
   }));
 
   // ---- Saisie des notes ----
+  // Notes tapées mais pas encore enregistrées : on prévient avant de les perdre
+  // (changement d'élève, de classe ou de semestre, déconnexion, fermeture de la page)
+  let grilleModifiee = false, classeNotes = "";
+  $("grille-container").addEventListener("input", () => { grilleModifiee = true; });
+  function abandonnerSaisie() {
+    if (!grilleModifiee) return true;
+    if (!confirm("Des notes ont été modifiées mais pas enregistrées. Les abandonner ?")) return false;
+    grilleModifiee = false;
+    return true;
+  }
+  window.addEventListener("beforeunload", (e) => { if (grilleModifiee) { e.preventDefault(); e.returnValue = ""; } });
+
   $("n-classe").addEventListener("change", (e) => {
+    if (!abandonnerSaisie()) { e.target.value = classeNotes; return; }
+    classeNotes = e.target.value;
     const classe = e.target.value;
     const sel = $("n-eleve");
     eleveSelectionne = null;
@@ -1652,9 +1732,13 @@
       elevesParClasse[classe].map((el) => "<option value='" + esc(el.uid) + "'>" + esc(el.nom) + "</option>").join("");
     chargerGrille();
   });
-  $("n-eleve").addEventListener("change", async (e) => { eleveSelectionne = e.target.value || null; cacherStatus("status-note"); await chargerGrille(); });
+  $("n-eleve").addEventListener("change", async (e) => {
+    if (!abandonnerSaisie()) { e.target.value = eleveSelectionne || ""; return; }
+    eleveSelectionne = e.target.value || null; cacherStatus("status-note"); await chargerGrille();
+  });
   document.querySelectorAll("[data-sem]").forEach((btn) => {
     btn.addEventListener("click", async () => {
+      if (!abandonnerSaisie()) return;
       document.querySelectorAll("[data-sem]").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       semestreActif = parseInt(btn.dataset.sem);
@@ -1668,6 +1752,7 @@
     const container = $("grille-container");
     const classe = $("n-classe").value;
     const jeton = ++jetonGrille;
+    grilleModifiee = false;
     $("btn-save-grille").disabled = true;
     const refusS2 = "<div class='alerte'>🔒 <b>Accès refusé.</b> Le 1er semestre de " + esc(classe) + " n'est pas encore clôturé : la saisie du 2nd semestre s'ouvrira après sa clôture (menu « Clôturer un semestre »).</div>";
     if (!classe) { container.innerHTML = ""; return; }
@@ -1754,6 +1839,7 @@
       await setDoc(doc(db, "bulletins", idBulletin(eleveSelectionne, semestreActif)), {
         eleve_id: eleveSelectionne, classe, semestre: semestreActif, annee_scolaire: ANNEE_SCOLAIRE, notes, cloture: false
       });
+      grilleModifiee = false;
       showStatus("status-note", "Notes de " + nom + " enregistrées (" + (semestreActif === 1 ? "1er" : "2nd") + " semestre).", true);
     } catch (e) { showStatus("status-note", messageErreur(e), false); }
   }));
@@ -1963,15 +2049,22 @@
   const estTerminale = (c) => /^Terminale/.test(c);
   // Le passage concerne toute l'école : un bloc par classe avec un résumé ; la liste des élèves est repliée
   let jetonPassage = 0;
+  // Classes où il reste au moins un élève qui n'est pas encore passé à l'année suivante
+  const classesAFairePasser = () => trierClasses(Object.keys(elevesParClasse)).filter((c) => elevesParClasse[c].some((el) => !el.historique.includes(ANNEE_SCOLAIRE)));
   async function verifierBoutonPassage() {
     const jeton = ++jetonPassage;
     const classes = trierClasses(Object.keys(elevesParClasse));
     const etat = $("passage-etat"), table = $("table-succession"), btn = $("btn-confirmer-passage");
     if (!classes.length) { etat.innerHTML = "<div class='vide'>📭 Aucun élève actif.</div>"; table.innerHTML = ""; $("passage-contenu").hidden = true; return; }
     etat.innerHTML = "<div class='squelette'><span></span><span></span></div>";
-    const stats = await Promise.all(classes.map((c) => lireStats(doc(db, "statistiques_classe", idStatsAnnuel(c)))));
+    // Seules comptent les classes où il reste des élèves à faire passer : après un passage interrompu,
+    // les élèves déjà passés sont dans leur nouvelle classe, qui n'a pas forcément de résultat cette année.
+    const aVerifier = classesAFairePasser();
+    const lus = await Promise.all(aVerifier.map((c) => lireStats(doc(db, "statistiques_classe", idStatsAnnuel(c)))));
     if (jeton !== jetonPassage) return;
-    const manquantes = classes.filter((c, i) => !stats[i].exists());
+    const statsParClasse = {};
+    aVerifier.forEach((c, i) => { statsParClasse[c] = lus[i]; });
+    const manquantes = aVerifier.filter((c) => !statsParClasse[c].exists());
     if (manquantes.length) {
       // Pour chaque classe en retard, on indique le semestre qui reste à clôturer
       const s1 = await Promise.all(manquantes.map((c) => lireStats(doc(db, "statistiques_classe", idStats(c, 1)))));
@@ -1980,41 +2073,54 @@
       table.innerHTML = "";
       etat.innerHTML = "<div class='passage-verrou'><div class='verrou-ico'>🔒</div><div><b>Le passage à l'année supérieure n'est pas encore disponible.</b>" +
         "<p>Les deux semestres doivent être clôturés dans <b>toutes les classes</b> (menu « Clôturer un semestre ») avant de passer à l'année suivante.</p>" +
-        "<p class='verrou-avance'>Classes prêtes : " + (classes.length - manquantes.length) + " / " + classes.length + "</p>" +
+        "<p class='verrou-avance'>Classes prêtes : " + (aVerifier.length - manquantes.length) + " / " + aVerifier.length + "</p>" +
         "<div class='succ-resume'>" + manquantes.map((c, i) => "<span class='puce-succ manque'>" + esc(c) + " : " + (s1[i].exists() ? "2nd semestre" : "1er et 2nd semestres") + " à clôturer</span>").join("") + "</div></div></div>";
       return;
     }
     $("passage-contenu").hidden = false;
-    etat.innerHTML = "<div class='etat-clotures'><b>Les deux semestres sont clôturés dans les " + classes.length + " classes.</b><span class='puce-succ ok'>✅ Passage possible</span></div>";
+    etat.innerHTML = aVerifier.length
+      ? "<div class='etat-clotures'><b>Les deux semestres sont clôturés dans les " + aVerifier.length + " classes.</b><span class='puce-succ ok'>✅ Passage possible</span></div>"
+      : "<div class='etat-clotures'><b>Tous les élèves sont déjà passés à l'année suivante.</b> Confirmez pour terminer le passage (changement de l'année active).</div>";
     btn.disabled = false;
     const options = (val, avecChoix) => (avecChoix ? "<option value=''>— Choisir la classe —</option>" : "") +
       ORDRE_CLASSES.map((c) => "<option value='" + esc(c) + "'" + (c === val ? " selected" : "") + ">" + esc(c) + "</option>").join("") +
       "<option value='" + DEPART + "'" + (val === DEPART ? " selected" : "") + ">🎓 Quitte l'établissement</option>";
     let html = "";
     classes.forEach((c, i) => {
-      const st = stats[i];
-      const admisParUid = {};
-      if (st.exists()) (st.data().classement || []).forEach((x) => { admisParUid[x.uid] = x.admis; });
+      const st = statsParClasse[c];
+      // Résultat annuel de chaque élève : true (admis), false (non admis) ; absent = inscrit après la clôture.
+      // Un très ancien classement sans identifiant d'élève est lu par le nom.
+      const admisParUid = {}, admisParNom = {};
+      let avecUid = false;
+      if (st && st.exists()) (st.data().classement || []).forEach((x) => {
+        const a = x.admis !== undefined ? x.admis : (x.moyenne !== null && x.moyenne >= 10);
+        if (x.uid) { admisParUid[x.uid] = a; avecUid = true; }
+        if (x.nom) admisParNom[x.nom] = a;
+      });
+      const resultatDe = (el) => el.uid in admisParUid ? admisParUid[el.uid] : (!avecUid && el.nom in admisParNom ? admisParNom[el.nom] : undefined);
       const suivante = SUCCESSION[c] || "";
       const aFaire = elevesParClasse[c].filter((el) => !el.historique.includes(ANNEE_SCOLAIRE));
       const faits = elevesParClasse[c].length - aFaire.length;
       const n = elevesParClasse[c].length;
       html += "<div class='succ-groupe' data-groupe='" + esc(c) + "'><div class='succ-tete'><h4>" + esc(c) + "<small>" + n + " élève" + (n > 1 ? "s" : "") +
-        (st.exists() ? "" : " · ⚠️ année non clôturée") + "</small></h4><span class='succ-resume' data-resume='" + esc(c) + "'></span></div>";
+        (!st || st.exists() ? "" : " · ⚠️ année non clôturée") + "</small></h4><span class='succ-resume' data-resume='" + esc(c) + "'></span></div>";
       if (faits) html += "<p class='succ-note'>✅ " + faits + " élève" + (faits > 1 ? "s" : "") + " déjà passé" + (faits > 1 ? "s" : "") + " à l'année suivante.</p>";
       if (!suivante && !estTerminale(c) && aFaire.length) {
         html += "<div class='succ-masse'><label for='masse-" + i + "'>Tous les admis de " + esc(c) + " vont en :</label><select id='masse-" + i + "' data-masse='" + esc(c) + "'>" + options("", true) + "</select></div>";
       }
       if (aFaire.length) {
         html += "<details class='succ-details' data-details='" + esc(c) + "'><summary>Voir et modifier les élèves (" + aFaire.length + ")</summary>" + aFaire.map((el) => {
-          const admis = admisParUid[el.uid];
+          const admis = resultatDe(el);
+          const sansResultat = admis === undefined;
           const nonAdmis = admis === false;
           let val, info;
-          if (nonAdmis) { val = c; info = "Non admis, redouble"; }
+          // Inscrit après la clôture de l'année (souvent pour l'an prochain) : il reste dans sa classe
+          if (sansResultat) { val = c; info = "Pas de résultat cette année (inscrit après la clôture) : reste en " + c; }
+          else if (nonAdmis) { val = c; info = "Non admis, redouble"; }
           else if (estTerminale(c)) { val = DEPART; info = "Admis, fin de scolarité"; }
           else if (suivante) { val = suivante; info = admis ? "Admis" : "Passe en " + suivante; }
           else { val = ""; info = "Admis, série à choisir"; }
-          return "<div class='liste-ligne" + (nonAdmis ? " redouble" : val === "" ? " a-choisir" : "") + "' data-ligne-classe='" + esc(c) + "' data-admis='" + (admis !== false) + "'>" +
+          return "<div class='liste-ligne" + (nonAdmis ? " redouble" : val === "" ? " a-choisir" : "") + "' data-ligne-classe='" + esc(c) + "' data-admis='" + (sansResultat ? "inconnu" : admis !== false) + "'>" +
             "<div class='quoi'><b>" + esc(el.nom) + "</b><small>" + info + "</small></div>" +
             "<select data-succ-uid='" + esc(el.uid) + "' aria-label='Classe de " + esc(el.nom) + " l'an prochain'>" + options(val, val === "") + "</select></div>";
         }).join("") + "</details>";
@@ -2039,13 +2145,19 @@
     const zone = document.querySelector("[data-resume='" + c + "']");
     if (!zone) return;
     const compte = {};
-    document.querySelectorAll("[data-ligne-classe='" + c + "'] select").forEach((sel) => { compte[sel.value] = (compte[sel.value] || 0) + 1; });
+    let restentSansResultat = 0;
+    document.querySelectorAll("[data-ligne-classe='" + c + "']").forEach((ligne) => {
+      const v = ligne.querySelector("select").value;
+      if (v === c && ligne.dataset.admis === "inconnu") { restentSansResultat++; return; }
+      compte[v] = (compte[v] || 0) + 1;
+    });
     const puces = [];
     Object.keys(compte).sort((x, y) => ORDRE_CLASSES.indexOf(x) - ORDRE_CLASSES.indexOf(y)).forEach((v) => {
       if (v === "" || v === DEPART || v === c) return;
       puces.push("<span class='puce-succ'>→ " + esc(v) + " : " + compte[v] + "</span>");
     });
     if (compte[c]) puces.push("<span class='puce-succ redouble'>Redoublent : " + compte[c] + "</span>");
+    if (restentSansResultat) puces.push("<span class='puce-succ'>Restent (sans résultat) : " + restentSansResultat + "</span>");
     if (compte[DEPART]) puces.push("<span class='puce-succ depart'>🎓 Quittent : " + compte[DEPART] + "</span>");
     if (compte[""]) puces.push("<span class='puce-succ manque'>⚠️ À choisir : " + compte[""] + "</span>");
     zone.innerHTML = puces.join("") || "<span class='puce-succ'>Rien à faire</span>";
@@ -2054,10 +2166,13 @@
 
   $("btn-confirmer-passage").addEventListener("click", (ev) => occupe(ev.currentTarget, async () => {
     const nouvelleAnnee = $("nouvelle-annee").value.trim();
-    if (!/^\d{4}-\d{4}$/.test(nouvelleAnnee)) { showStatus("status-passage", "Indiquez la nouvelle année au format 2027-2028.", false); return; }
+    const nv = nouvelleAnnee.match(/^(\d{4})-(\d{4})$/), act = ANNEE_SCOLAIRE.match(/^(\d{4})-(\d{4})$/);
+    if (!nv || +nv[2] !== +nv[1] + 1) { showStatus("status-passage", "Indiquez la nouvelle année au format 2027-2028 (deux années qui se suivent).", false); return; }
+    // Une année identique ou plus ancienne ferait changer tous les élèves de classe sans changer d'année
+    if (act && +nv[1] <= +act[1]) { showStatus("status-passage", "La nouvelle année doit venir après l'année en cours (" + ANNEE_SCOLAIRE + ") : par exemple " + incrementerAnnee(ANNEE_SCOLAIRE) + ".", false); return; }
     // Protection : on ne change pas l'année de toute l'école tant qu'une classe n'a pas son résultat annuel
     const manquantes = [];
-    for (const c of Object.keys(elevesParClasse)) {
+    for (const c of classesAFairePasser()) {
       const s = await lireStats(doc(db, "statistiques_classe", idStatsAnnuel(c)));
       if (!s.exists()) manquantes.push(c);
     }
@@ -2074,9 +2189,13 @@
       return;
     }
     const departs = selects.filter((sel) => sel.value === DEPART).length;
-    const redoublent = selects.filter((sel) => sel.value === sel.closest(".liste-ligne").dataset.ligneClasse).length;
-    const montent = selects.length - departs - redoublent;
-    if (!confirm("Passer toute l'école à l'année " + nouvelleAnnee + " ?\n\n• " + montent + " élève(s) changent de classe\n• " + redoublent + " redoublent\n• " + departs + " quittent l'établissement (retirés des listes, historique conservé)\n\nCette action change l'année active pour tous les utilisateurs.")) return;
+    const restent = selects.filter((sel) => sel.value === sel.closest(".liste-ligne").dataset.ligneClasse);
+    const sansResultat = restent.filter((sel) => sel.closest(".liste-ligne").dataset.admis === "inconnu").length;
+    const redoublent = restent.length - sansResultat;
+    const montent = selects.length - departs - restent.length;
+    if (!confirm("Passer toute l'école à l'année " + nouvelleAnnee + " ?\n\n• " + montent + " élève(s) changent de classe\n• " + redoublent + " redoublent" +
+      (sansResultat ? "\n• " + sansResultat + " restent dans leur classe (inscrits après la clôture, sans résultat cette année)" : "") +
+      "\n• " + departs + " quittent l'établissement (retirés des listes, historique conservé)\n\nCette action change l'année active pour tous les utilisateurs.")) return;
     try {
       // historique_annees sert aussi de repère : un élève déjà passé n'est jamais traité deux fois si on relance
       const taches = selects.map((sel) => () => updateDoc(doc(db, "utilisateurs", sel.dataset.succUid),
@@ -2086,6 +2205,7 @@
       await parPaquets(taches, 20, (n, total) => showStatus("status-passage", "Passage en cours : " + n + " / " + total + " élèves…", true));
       await setDoc(doc(db, "config", "annee_active"), { valeur: nouvelleAnnee, annees_archivees: arrayUnion(ANNEE_SCOLAIRE) }, { merge: true });
       showStatus("status-passage", "Passage effectué. Nouvelle année scolaire active : " + nouvelleAnnee + ". " + departs + " départ(s) retiré(s) des listes.", true);
+      retires = null; $("retires-bloc").open = false; $("retires-compte").textContent = "afficher";   // les départs y figureront
       $("table-succession").innerHTML = "";
       $("passage-etat").innerHTML = "";
       $("passage-contenu").hidden = true;
@@ -2212,11 +2332,6 @@
         });
         const rangDe = (e) => (e.p2 && e.p2.rang) || (e.p1 && e.p1.rang) || (e.p0 && e.p0.rang) || 9999;
         const liste = Array.from(eleves.entries()).sort((a, b) => rangDe(a[1]) - rangDe(b[1]) || a[1].nom.localeCompare(b[1].nom, "fr"));
-        liste.forEach(([, e]) => resultats.push({ "Année": annee, "Classe": classe, "Élève": e.nom,
-          "Moyenne S1": arrondi(e.p0 && e.p0.moyenne, 3), "Rang S1": (e.p0 && e.p0.rang) || undefined,
-          "Moyenne S2": arrondi(e.p1 && e.p1.moyenne, 3), "Rang S2": (e.p1 && e.p1.rang) || undefined,
-          "Moyenne annuelle": arrondi(e.p2 && e.p2.moyenne, 3), "Rang annuel": (e.p2 && e.p2.rang) || undefined,
-          "Statut annuel": e.p2 ? (e.p2.admis ? "Admis" : "Non admis") : undefined }));
         // Notes détaillées : mêmes calculs que sur le bulletin (lignesBulletin)
         const taches = [];
         liste.forEach(([uid, e]) => [1, 2].forEach((sem) => taches.push({ uid, nom: e.nom, sem })));
@@ -2226,6 +2341,14 @@
           const snaps = await Promise.all(paquet.map((t) => lire(doc(db, "bulletins", idBulletinPour(t.uid, t.sem, annee)))));
           paquet.forEach((t, k) => lus.push([t, snaps[k]]));
         }
+        // Élève arrivé après la clôture du 1er semestre : sa moyenne du 1er semestre est sur son bulletin (hors classement)
+        const s1HorsClassement = {};
+        lus.forEach(([t, snap]) => { if (t.sem === 1 && snap.exists() && snap.data().hors_classement && present(snap.data().moyenne_generale)) s1HorsClassement[t.uid] = snap.data().moyenne_generale; });
+        liste.forEach(([uid, e]) => resultats.push({ "Année": annee, "Classe": classe, "Élève": e.nom,
+          "Moyenne S1": arrondi(e.p0 ? e.p0.moyenne : s1HorsClassement[uid], 3), "Rang S1": e.p0 ? (e.p0.rang || undefined) : (uid in s1HorsClassement ? "Non classé" : undefined),
+          "Moyenne S2": arrondi(e.p1 && e.p1.moyenne, 3), "Rang S2": (e.p1 && e.p1.rang) || undefined,
+          "Moyenne annuelle": arrondi(e.p2 && e.p2.moyenne, 3), "Rang annuel": (e.p2 && e.p2.rang) || undefined,
+          "Statut annuel": e.p2 ? (e.p2.admis ? "Admis" : "Non admis") : undefined }));
         lus.forEach(([t, snap]) => {
           if (!snap.exists()) return;
           const d = snap.data();
@@ -2757,17 +2880,22 @@
   if (autonome) return; // déjà ouverte comme application : pas de bouton d'installation
   var invite = null;
   var bloc = document.getElementById("installer"), bouton = document.getElementById("btn-installer");
+  var aideAndroid = document.getElementById("installer-android");
   window.addEventListener("beforeinstallprompt", function (e) {
     e.preventDefault();
     invite = e;
     bloc.hidden = false;
+    aideAndroid.hidden = true;   // le bouton suffit
   });
   bouton.addEventListener("click", function () {
     if (!invite) return;
     invite.prompt();
     invite.userChoice.then(function () { invite = null; bloc.hidden = true; });
   });
-  window.addEventListener("appinstalled", function () { bloc.hidden = true; });
+  window.addEventListener("appinstalled", function () { bloc.hidden = true; aideAndroid.hidden = true; });
+  // Android : si Chrome ne propose pas le bouton après quelques secondes (il attend parfois que la page
+  // ait été un peu utilisée), on indique le chemin par le menu de Chrome
+  if (/android/i.test(navigator.userAgent)) setTimeout(function () { if (!invite) aideAndroid.hidden = false; }, 6000);
   // iPhone / iPad : Safari ne propose pas de bouton, on explique la marche à suivre
   if (/iphone|ipad|ipod/i.test(navigator.userAgent)) document.getElementById("installer-ios").hidden = false;
 })();
