@@ -390,9 +390,8 @@
     background: #F3F6F4; border: 1px solid #DFE7E2; line-height: 18px; }
   table.bulletin td.dev span { margin: 0; }
   .vide-n { background: transparent !important; border-color: transparent !important; }
-  /* Titres des devoirs : pastille jaune (texte foncé pour rester lisible) */
-  .lbl-dev, th.th-dev span { background: #FFE27A; color: #5C4300; border-radius: 6px; padding: 2px 7px; font-weight: 800; }
-  .lbl-int { background: var(--colline-pale); color: var(--colline); border-radius: 6px; padding: 2px 7px; font-weight: 800; }
+  /* Titres des interros et des devoirs : pastille jaune (texte foncé pour rester lisible) */
+  .lbl-dev, .lbl-int, th.th-dev span, th.th-int span { background: #FFE27A; color: #5C4300; border-radius: 6px; padding: 2px 7px; font-weight: 800; }
   table.grille td.td-dev input { background: #FFFBEA; border-color: #F0D78A; }
   /* Une note de devoir invalide passe en rouge, comme les interros (le jaune ne doit pas masquer l'erreur) */
   table.grille td.td-dev input[aria-invalid=true] { background: var(--echec-pale); border-color: var(--echec); }
@@ -2840,7 +2839,7 @@
     let h = "<div class='ligne f-titre'><h2>" + titreSemestre(sem) + "</h2><span class='puce " + (cloture ? "cloture'>🔒 Clôturé" : "encours'" + (maj ? " title='Dernière mise à jour des notes le " + maj + "'" : "") + ">✏️ En cours" + (maj ? " · " + maj : "")) + "</span></div>";
 
     // --- Ordinateur / tablette : tableau complet ---
-    h += "<div class='tb-large'><table class='bulletin'><thead><tr><th class='g'>Matières</th><th>Coef.</th><th class='int'>Interrogations</th><th>Moy. int.</th><th class='th-dev'><span>Dev. 1</span></th><th class='th-dev'><span>Dev. 2</span></th><th class='fort'>Moy. /20</th><th>Points</th></tr></thead><tbody>";
+    h += "<div class='tb-large'><table class='bulletin'><thead><tr><th class='g'>Matières</th><th>Coef.</th><th class='th-int'><span>Interrogations</span></th><th>Moy. int.</th><th class='th-dev'><span>Dev. 1</span></th><th class='th-dev'><span>Dev. 2</span></th><th class='fort'>Moy. /20</th><th>Points</th></tr></thead><tbody>";
     lignes.forEach((l) => {
       if (l.conduite) {
         h += "<tr><td class='g'>" + esc(l.mat) + "</td><td>" + l.coef + "</td><td class='int'></td><td></td><td></td><td></td><td class='fort'>" + neutre(l.moy, 2) + "</td><td>" + neutre(l.points, 2) + "</td></tr>";
