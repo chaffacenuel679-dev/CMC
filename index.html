@@ -608,7 +608,7 @@
   .changer-classe select { max-width: 200px; height: 38px; font-size: 14px; }
 
   /* ---------- Impression du bulletin (et « Enregistrer en PDF ») ---------- */
-  .entete-impression, .pied-impression { display: none; }
+  .entete-impression, .pied-impression, .impression-refusee { display: none; }
   @media print {
     @page { size: A4; margin: 12mm; }
     *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -620,6 +620,8 @@
     .entete-impression b { display: block; font-family: var(--titre); font-size: 19px; color: var(--colline); }
     .entete-impression span { font-size: 13px; color: var(--encre-2); }
     .entete-impression .ei-doc { margin-left: auto; font-family: var(--titre); font-weight: 700; font-size: 15px; text-align: right; }
+    body[data-ecran="eleve"][data-impression="non"] #vue-eleve > :not(.impression-refusee), body[data-ecran="eleve"][data-impression="non"] .pied-impression { display: none !important; }
+    body[data-ecran="eleve"][data-impression="non"] .impression-refusee { display: block; margin: 40px 0; font-size: 16px; text-align: center; }
     .pied-impression { display: block; margin: 10px 0 0; font-size: 11px; color: var(--encre-2); text-align: center; }
     .eleve-tete { background: none !important; color: var(--encre); box-shadow: none; border-radius: 0; padding: 0 0 6px; margin-bottom: 8px; }
     .eleve-tete::after { display: none; }
@@ -912,6 +914,7 @@
       <button class="btn contour petit btn-imprimer btn-ico" id="btn-imprimer" type="button" data-imprimer title="Imprimer ou enregistrer en PDF" aria-label="Imprimer ou enregistrer en PDF">🖨️<span class="lib"> Imprimer / PDF</span></button>
     </div>
     <article class="feuille" id="feuille" aria-live="polite"></article>
+    <p class="impression-refusee">Ce bulletin n'est pas encore clôturé : il pourra être imprimé ou enregistré en PDF après la clôture du semestre.</p>
     <section class="panneau panneau-classement">
       <h2>🏆 Classement de la classe</h2>
       <div id="classement-eleve" style="margin-top:16px"></div>
@@ -2632,6 +2635,12 @@
   }
 
   // ================= Vue élève / parents =================
+  // Un bulletin ne s'imprime (ni ne s'enregistre en PDF) que si son semestre est clôturé :
+  // le bouton disparaît, et l'impression par le menu du navigateur n'affiche qu'un message.
+  function autoriserImpression(ok) {
+    $("btn-imprimer").hidden = !ok;
+    document.body.dataset.impression = ok ? "oui" : "non";
+  }
   let jetonRendu = 0;
   async function afficherBulletinEleve(uid, nom, classeActuelle) {
     $("eleve-titre").textContent = nom || "";
@@ -2678,6 +2687,7 @@
 
     async function render() {
       const jeton = ++jetonRendu;
+      autoriserImpression(false);
       const feuille = $("feuille");
       const zoneCl = $("classement-eleve");
       feuille.innerHTML = "<div class='squelette' aria-label='Chargement'><span></span><span></span><span></span><span></span></div>";
@@ -2727,6 +2737,7 @@
         feuille.innerHTML = data
           ? construireFeuille(data, classeAnnee, semEleve, statsSem.exists() ? statsSem.data() : null, semEleve === 2 ? dAn : null)
           : feuilleVide(semEleve, message);
+        autoriserImpression(!!(data && data.cloture === true));
 
         // Classement : onglet 1 = 1er semestre ; onglet 2 = 1er + 2nd semestre + résultat annuel
         // (un élève arrivé après la clôture du 1er semestre peut ne pas avoir accès à ce classement-là)

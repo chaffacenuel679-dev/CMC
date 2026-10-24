@@ -14,7 +14,10 @@ service cloud.firestore {
     match /utilisateurs/{uid} {
       allow read: if connecte() && (request.auth.uid == uid || estAdmin());
       allow create: if estAdmin() && request.resource.data.role in ['eleve', 'admin'];
-      allow update: if estAdmin() && request.resource.data.role == resource.data.role;
+      // Un élève retiré ne peut être réintégré (statut « inactif » → « actif ») que dans les 10 jours qui suivent son retrait
+      allow update: if estAdmin() && request.resource.data.role == resource.data.role
+                    && (!(resource.data.get('statut', 'actif') == 'inactif' && request.resource.data.get('statut', 'actif') != 'inactif')
+                        || (resource.data.get('retire_le', null) is timestamp && request.time < resource.data.retire_le + duration.value(10, 'd')));
       allow delete: if false;
     }
 
