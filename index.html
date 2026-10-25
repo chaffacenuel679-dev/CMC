@@ -828,7 +828,7 @@
         <div id="g-liste"></div>
         <details class="corbeille" id="retires-bloc">
           <summary>↩️ Élèves retirés <span id="retires-compte" class="puce-succ">afficher</span></summary>
-          <p style="margin:0 0 8px;color:var(--encre-2);font-size:13.5px">Réintégration possible dans 10 jours après le retrait (même compte, historique conservé).</p>
+          <p style="margin:0 0 8px;color:var(--encre-2);font-size:13.5px">Réintégration possible dans les 10 jours qui suivent le retrait (même compte, historique conservé).</p>
           <div class="champ" style="max-width:420px"><input type="search" id="retires-filtre" placeholder="Filtrer par nom" aria-label="Filtrer les élèves retirés par nom" autocomplete="off" spellcheck="false" /></div>
           <div id="retires-liste"></div>
           <div class="statut" id="status-retires" role="status"></div>
@@ -1827,13 +1827,20 @@
     try {
       // Le 1er semestre de l'élève est verrouillé, ou bien la classe est clôturée et l'élève est arrivé après
       const s1 = await getDoc(doc(db, "bulletins", idBulletin(eleveSelectionne, 1)));
-      if (!(s1.exists() && s1.data().cloture === true)) {
+      // Un bulletin hérité d'une AUTRE classe (élève déplacé via « changer de classe ») ne compte pas comme
+      // un 1er semestre clôturé ICI : on le traite comme inexistant pour cette classe (grille vierge à nouveau).
+      const d1Valide = s1.exists() && s1.data().classe === classe ? s1.data() : null;
+      const s1Cloture = !!(d1Valide && d1Valide.cloture === true);
+      if (!s1Cloture) {
         arriveApresS1 = (await lireStats(doc(db, "statistiques_classe", idStats(classe, 1)))).exists();
       }
       if (jeton !== jetonGrille) return;
-      if (semestreActif === 2 && !(s1.exists() && s1.data().cloture === true) && !arriveApresS1) { container.innerHTML = refusS2; return; }
-      const snap = semestreActif === 1 ? s1 : await getDoc(doc(db, "bulletins", idBulletin(eleveSelectionne, 2)));
-      data = snap.exists() ? snap.data() : {};
+      if (semestreActif === 2 && !s1Cloture && !arriveApresS1) { container.innerHTML = refusS2; return; }
+      if (semestreActif === 1) { data = d1Valide || {}; }
+      else {
+        const snap = await getDoc(doc(db, "bulletins", idBulletin(eleveSelectionne, 2)));
+        data = snap.exists() && snap.data().classe === classe ? snap.data() : {};
+      }
     }
     catch (e) { if (jeton === jetonGrille) container.innerHTML = "<div class='alerte'>" + esc(messageErreur(e)) + "</div>"; return; }
     if (jeton !== jetonGrille) return; // un autre élève/semestre a été choisi entretemps
@@ -2002,7 +2009,7 @@
       lignes.push({ el, data: s.exists() ? s.data() : null });
     }
     const statsExistantes = await lireStats(doc(db, "statistiques_classe", idStats(classe, 1)));
-    if (statsExistantes.exists() && lignes.every((l) => l.data && l.data.cloture === true)) {
+    if (statsExistantes.exists() && lignes.every((l) => l.data && l.data.cloture === true && l.data.classe === classe)) {
       showStatus("status-cloture", "Le 1er semestre de " + classe + " est déjà clôturé.", false);
       $("recap-cloture").innerHTML = construireTableClassement("1er semestre, " + classe, statsExistantes.data(), false);
       return;
@@ -2017,7 +2024,9 @@
     for (const item of liste) {
       n++;
       showStatus("status-cloture", "Clôture en cours… " + n + " / " + liste.length, true);
-      if (item.data && item.data.cloture === true) continue; // déjà verrouillé lors d'une clôture interrompue
+      // déjà verrouillé lors d'une clôture interrompue de CETTE classe (un bulletin cloture:true
+      // hérité d'une autre classe, après un changement de classe, est recalculé pour celle-ci)
+      if (item.data && item.data.cloture === true && item.data.classe === classe) continue;
       await setDoc(doc(db, "bulletins", idBulletin(item.uid, 1)), {
         eleve_id: item.uid, classe, semestre: 1, annee_scolaire: ANNEE_SCOLAIRE,
         notes: (item.data && item.data.notes) || {}, cloture: true, moyenne_generale: item.moyenne, rang: item.rang, effectif: eleves.length
@@ -2045,7 +2054,7 @@
       lignes.push({ el, d1: s1.exists() ? s1.data() : null, d2: s2.exists() ? s2.data() : null });
     }
     const statsAnnExistantes = await lireStats(doc(db, "statistiques_classe", idStatsAnnuel(classe)));
-    if (statsAnnExistantes.exists() && lignes.every((l) => l.d2 && l.d2.cloture === true)) {
+    if (statsAnnExistantes.exists() && lignes.every((l) => l.d2 && l.d2.cloture === true && l.d2.classe === classe)) {
       showStatus("status-cloture", "Le 2nd semestre de " + classe + " est déjà clôturé.", false);
       const s2 = await lireStats(doc(db, "statistiques_classe", idStats(classe, 2)));
       $("recap-cloture").innerHTML = (s2.exists() ? construireTableClassement("2nd semestre, " + classe, s2.data(), false) : "") +
@@ -2063,14 +2072,16 @@
     for (const item of listeS2) {
       n++;
       showStatus("status-cloture", "Clôture en cours… " + n + " / " + listeS2.length, true);
-      if (!(item.d2 && item.d2.cloture === true)) {
+      if (!(item.d2 && item.d2.cloture === true && item.d2.classe === classe)) {
         await setDoc(doc(db, "bulletins", idBulletin(item.uid, 2)), {
           eleve_id: item.uid, classe, semestre: 2, annee_scolaire: ANNEE_SCOLAIRE,
           notes: (item.d2 && item.d2.notes) || {}, cloture: true, moyenne_generale: item.moyenne, rang: item.rang, effectif: eleves.length
         });
       }
-      let moyS1 = item.d1 && item.d1.cloture === true ? item.d1.moyenne_generale : null;
-      if (!(item.d1 && item.d1.cloture === true)) {
+      // Un S1 clôturé sous une AUTRE classe (élève déplacé depuis) ne compte pas comme classé ici :
+      // même traitement qu'un élève arrivé après la clôture du 1er semestre de cette classe.
+      let moyS1 = item.d1 && item.d1.cloture === true && item.d1.classe === classe ? item.d1.moyenne_generale : null;
+      if (!(item.d1 && item.d1.cloture === true && item.d1.classe === classe)) {
         // Arrivé après la clôture du 1er semestre : ses éventuelles notes du 1er semestre sont
         // verrouillées maintenant, hors classement (le classement publié du 1er semestre ne change pas).
         const m = moyenneGenerale((item.d1 && item.d1.notes) || {}, bareme);
