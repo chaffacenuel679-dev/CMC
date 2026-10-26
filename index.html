@@ -619,7 +619,8 @@
     .entete-impression b { display: block; font-family: var(--titre); font-size: 19px; color: var(--colline); }
     .entete-impression span { font-size: 13px; color: var(--encre-2); }
     .entete-impression .ei-doc { margin-left: auto; font-family: var(--titre); font-weight: 700; font-size: 15px; text-align: right; }
-    body[data-ecran="eleve"][data-impression="non"] #vue-eleve > :not(.impression-refusee), body[data-ecran="eleve"][data-impression="non"] .pied-impression { display: none !important; }
+    body[data-ecran="eleve"][data-impression="non"] #vue-eleve > :not(.impression-refusee), body[data-ecran="eleve"][data-impression="non"] .pied-impression,
+    body[data-ecran="eleve"][data-impression="non"] .entete-impression { display: none !important; }
     body[data-ecran="eleve"][data-impression="non"] .impression-refusee { display: block; margin: 40px 0; font-size: 16px; text-align: center; }
     .pied-impression { display: block; margin: 10px 0 0; font-size: 11px; color: var(--encre-2); text-align: center; }
     .eleve-tete { background: none !important; color: var(--encre); box-shadow: none; border-radius: 0; padding: 0 0 6px; margin-bottom: 8px; }
