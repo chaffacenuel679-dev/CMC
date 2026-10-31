@@ -771,6 +771,7 @@
         <p class="intro">Un compte pour l'élève et ses parents : notez l'identifiant et le mot de passe pour la famille.</p>
         <div class="grille-form deux">
           <div class="champ"><label for="e-nom">Nom complet</label><input type="text" id="e-nom" autocomplete="off" /></div>
+          <div class="champ"><label for="e-sexe">Sexe</label><select id="e-sexe"><option value="">Choisir le sexe</option><option value="M">Masculin (M)</option><option value="F">Féminin (F)</option></select></div>
           <div class="champ"><label for="e-classe">Classe</label><select id="e-classe"></select></div>
           <div class="champ"><label for="e-email">E-mail (identifiant de connexion)</label><input type="email" id="e-email" autocomplete="off" autocapitalize="none" spellcheck="false" /></div>
           <div class="champ"><label for="e-password">Mot de passe (6 caractères minimum)</label><input type="text" id="e-password" autocomplete="off" spellcheck="false" /></div>
@@ -1232,6 +1233,14 @@
   }
   // Taux calculé sur les élèves classés (ceux qui ont une moyenne) : un élève sans aucune note
   // n'est ni admis ni en échec.
+  // Sexe (M / F) : saisi à l'inscription ; recopié dans les classements à la clôture (statistiques filles / garçons des archives)
+  const SEXES = { M: "Masculin", F: "Féminin" };
+  const texteSexe = (sx) => SEXES[sx] ? " · Sexe : " + sx : "";
+  function sexeDe(uid) {
+    for (const l of Object.values(elevesParClasse)) { const e = l.find((x) => x.uid === uid); if (e) return e.sexe || null; }
+    return null;
+  }
+  const avecSexe = (o) => { const sx = sexeDe(o.uid); return sx ? Object.assign(o, { sexe: sx }) : o; };
   function tauxReussite(liste) {
     const avecMoyenne = liste.filter((x) => x.moyenne !== null);
     const admis = avecMoyenne.filter((x) => x.moyenne >= 10).length;
@@ -1419,7 +1428,7 @@
       snap.forEach((d) => {
         const v = d.data();
         if (v.statut === "inactif") return; // élève retiré : exclu de toutes les listes actives
-        (elevesParClasse[v.classe] = elevesParClasse[v.classe] || []).push({ uid: d.id, nom: v.nom, historique: v.historique_annees || [] });
+        (elevesParClasse[v.classe] = elevesParClasse[v.classe] || []).push({ uid: d.id, nom: v.nom, sexe: v.sexe || null, historique: v.historique_annees || [] });
       });
       Object.values(elevesParClasse).forEach((l) => l.sort((a, b) => a.nom.localeCompare(b.nom, "fr")));
       const classes = trierClasses(Object.keys(elevesParClasse));
@@ -1438,10 +1447,11 @@
   // ---- Inscription ----
   $("btn-create-eleve").addEventListener("click", (ev) => occupe(ev.currentTarget, async () => {
     const nom = $("e-nom").value.trim().replace(/\s+/g, " ");
+    const sexe = $("e-sexe").value;
     const classe = $("e-classe").value;
     const email = $("e-email").value.trim().toLowerCase();
     const password = $("e-password").value;
-    if (!nom || !classe || !email || !password) { showStatus("status-eleve", "Remplissez les quatre champs.", false); return; }
+    if (!nom || !sexe || !classe || !email || !password) { showStatus("status-eleve", "Remplissez les cinq champs (nom, sexe, classe, e-mail, mot de passe).", false); return; }
     const probleme = verifierIdentite(nom, email, password);
     if (probleme) { showStatus("status-eleve", probleme, false); return; }
     // Même nom déjà inscrit (doublon par erreur, ou vrai homonyme) : on demande avant de créer
@@ -1451,9 +1461,9 @@
       showStatus("status-eleve", "Création annulée : un élève du même nom existe déjà.", false); return;
     }
     try {
-      await creerCompteSansDeconnecter(email, password, (uid) => setDoc(doc(db, "utilisateurs", uid), { nom, role: "eleve", classe, eleve_id: uid, email, statut: "actif" }));
-      showStatus("status-eleve", "Compte créé pour " + nom + " (" + classe + "). À remettre à la famille : identifiant « " + email + " », mot de passe « " + password + " ».", true);
-      $("e-nom").value = ""; $("e-email").value = ""; $("e-password").value = "";
+      await creerCompteSansDeconnecter(email, password, (uid) => setDoc(doc(db, "utilisateurs", uid), { nom, sexe, role: "eleve", classe, eleve_id: uid, email, statut: "actif" }));
+      showStatus("status-eleve", "Compte créé pour " + nom + " (" + classe + ", sexe " + sexe + "). À remettre à la famille : identifiant « " + email + " », mot de passe « " + password + " ».", true);
+      $("e-nom").value = ""; $("e-sexe").value = ""; $("e-email").value = ""; $("e-password").value = "";   // sexe à choisir à chaque élève
       $("e-nom").focus();
     } catch (e) { showStatus("status-eleve", messageErreur(e), false); }
   }));
@@ -2079,7 +2089,7 @@
       }, { merge: true });
     }
     const taux = tauxReussite(liste);
-    const classement = liste.map((x) => ({ uid: x.uid, nom: x.nom, moyenne: x.moyenne, rang: x.rang }));
+    const classement = liste.map((x) => avecSexe({ uid: x.uid, nom: x.nom, moyenne: x.moyenne, rang: x.rang }));
     await setDoc(doc(db, "statistiques_classe", idStats(classe, 1)), {
       classe, semestre: 1, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: taux, classement, eleves_uids: liste.map((x) => x.uid), effectif: eleves.length
     });
@@ -2153,8 +2163,8 @@
     }
     const tauxS2 = tauxReussite(listeS2);
     const tauxAnnuel = tauxReussite(listeAnnuel);
-    const classementS2 = listeS2.map((x) => ({ uid: x.uid, nom: x.nom, moyenne: x.moyenne, rang: x.rang }));
-    const classementAnnuel = listeAnnuel.map((x) => ({ uid: x.uid, nom: x.nom, moyenne: x.moyenne, rang: x.rang, admis: x.moyenne !== null && x.moyenne >= 10 }));
+    const classementS2 = listeS2.map((x) => avecSexe({ uid: x.uid, nom: x.nom, moyenne: x.moyenne, rang: x.rang }));
+    const classementAnnuel = listeAnnuel.map((x) => avecSexe({ uid: x.uid, nom: x.nom, moyenne: x.moyenne, rang: x.rang, admis: x.moyenne !== null && x.moyenne >= 10 }));
     const uids = listeS2.map((x) => x.uid);
     await setDoc(doc(db, "statistiques_classe", idStats(classe, 2)), {
       classe, semestre: 2, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: tauxS2, classement: classementS2, eleves_uids: uids, effectif: eleves.length
@@ -2421,6 +2431,9 @@
       nombre: { border: cadre, alignment: centre },
       admis: { border: cadre, alignment: centre, font: { bold: true, color: { rgb: "1E7B45" } } },
       refus: { border: cadre, alignment: centre, font: { bold: true, color: { rgb: "C42B2B" } } },
+      totalTexte: { border: cadre, font: { bold: true }, fill: { fgColor: { rgb: "F1F6F2" } } },
+      totalNombre: { border: cadre, alignment: centre, font: { bold: true }, fill: { fgColor: { rgb: "F1F6F2" } } },
+      note: { font: { italic: true, sz: 9, color: { rgb: "4A5C52" } } },
     };
   })();
   // Fabrique une feuille ligne par ligne (cellules { v, s, z }) ; une cellule vide garde son cadre
@@ -2458,21 +2471,33 @@
   const nomFeuille = (t) => String(t).replace(/[:\\/?*\[\]]/g, "-").slice(0, 31);
   const xlNb = (v, z) => ({ v: v === undefined ? "" : v, s: STY_XL.nombre, z: typeof v === "number" ? z : undefined });
   const ECOLE_XL = "Complexe Moderne des Collines (CMC) — Savè";
+  // Tableau des statistiques par sexe (une ligne Filles / Garçons / Total par période ; Total en gras)
+  const ENTETES_STATS_XL = ["Période", "Groupe", "Effectif", "Élèves classés", "Ayant la moyenne", "% ayant la moyenne", "N'ayant pas la moyenne", "% n'ayant pas la moyenne", "Moyenne du groupe", "Plus forte", "Plus faible"];
+  function lignesStatsXl(stats) {
+    return stats.map((x) => {
+      const total = x["Groupe"] === "Total";
+      const n = (v, z) => { const c = xlNb(v, z); if (total) c.s = STY_XL.totalNombre; return c; };
+      return [{ v: x["Période"], s: total ? STY_XL.totalTexte : STY_XL.texte }, { v: x["Groupe"], s: total ? STY_XL.totalTexte : STY_XL.texte },
+        n(x["Effectif"]), n(x["Élèves classés"]), n(x["Ayant la moyenne"]), n(x["% ayant la moyenne"], "0.0"), n(x["N'ayant pas la moyenne"]), n(x["% n'ayant pas la moyenne"], "0.0"),
+        n(x["Moyenne du groupe"], "0.000"), n(x["Plus forte"], "0.000"), n(x["Plus faible"], "0.000")];
+    });
+  }
+  const NOTE_STATS_XL = "Avoir la moyenne : 10/20 ou plus. Pourcentages calculés sur les élèves classés. Au résultat annuel, « ayant la moyenne » = admis.";
+  const compoSexes = (sx) => [sx.F ? sx.F + " fille" + (sx.F > 1 ? "s" : "") : "", sx.M ? sx.M + " garçon" + (sx.M > 1 ? "s" : "") : "", sx.autre ? sx.autre + " sexe non renseigné" : ""].filter(Boolean).join(", ");
   function feuilleClasse(XLSX, bloc, annee) {
     return feuilleExcel(XLSX, (f) => {
       f.bandeau(ECOLE_XL, STY_XL.ecole);
-      f.bandeau("Classe de " + bloc.classe + " — année scolaire " + annee + " — " + bloc.resultats.length + " élève(s)", STY_XL.titre);
+      f.bandeau("Classe de " + bloc.classe + " — année scolaire " + annee + " — " + bloc.resultats.length + " élève(s) : " + compoSexes(bloc.sexes), STY_XL.titre);
       f.vide();
       f.bandeau("RÉSULTATS DE LA CLASSE", STY_XL.section);
-      f.tableau(["Élève", "Moy. S1", "Rang S1", "Moy. S2", "Rang S2", "Moy. annuelle", "Rang annuel", "Décision"],
-        bloc.resultats.map((x) => [{ v: x["Élève"], s: STY_XL.texte }, xlNb(x["Moyenne S1"], "0.000"), xlNb(x["Rang S1"]), xlNb(x["Moyenne S2"], "0.000"), xlNb(x["Rang S2"]),
+      f.tableau(["Élève", "Sexe", "Moy. S1", "Rang S1", "Moy. S2", "Rang S2", "Moy. annuelle", "Rang annuel", "Décision"],
+        bloc.resultats.map((x) => [{ v: x["Élève"], s: STY_XL.texte }, xlNb(x["Sexe"]), xlNb(x["Moyenne S1"], "0.000"), xlNb(x["Rang S1"]), xlNb(x["Moyenne S2"], "0.000"), xlNb(x["Rang S2"]),
           xlNb(x["Moyenne annuelle"], "0.000"), xlNb(x["Rang annuel"]),
           { v: x["Statut annuel"] || "", s: x["Statut annuel"] === "Admis" ? STY_XL.admis : x["Statut annuel"] ? STY_XL.refus : STY_XL.nombre }]));
       f.vide();
-      f.bandeau("STATISTIQUES", STY_XL.section);
-      f.tableau(["Période", "Effectif", "Élèves classés", "Taux de réussite (%)", "Moyenne de la classe", "Plus forte", "Plus faible"],
-        bloc.stats.map((x) => [{ v: x["Période"], s: STY_XL.texte }, xlNb(x["Effectif"]), xlNb(x["Élèves classés"]), xlNb(x["Taux de réussite (%)"], "0.0"),
-          xlNb(x["Moyenne de la classe"], "0.000"), xlNb(x["Plus forte"], "0.000"), xlNb(x["Plus faible"], "0.000")]));
+      f.bandeau("STATISTIQUES (FILLES / GARÇONS)", STY_XL.section);
+      f.tableau(ENTETES_STATS_XL, lignesStatsXl(bloc.stats));
+      f.ligne([{ v: NOTE_STATS_XL, s: STY_XL.note }]);
       f.vide();
       f.bandeau("NOTES DÉTAILLÉES (par élève)", STY_XL.section);
       bloc.notes.forEach((b) => {
@@ -2482,23 +2507,32 @@
           b.lignes.map((l) => [{ v: l["Matière"], s: STY_XL.texte }, xlNb(l["Coef"]), xlNb(l["Interro 1"], "0.00"), xlNb(l["Interro 2"], "0.00"), xlNb(l["Interro 3"], "0.00"),
             xlNb(l["Moy. interros"], "0.00"), xlNb(l["Devoir 1"], "0.00"), xlNb(l["Devoir 2"], "0.00"), xlNb(l["Moyenne /20"], "0.00"), xlNb(l["Points"], "0.00")]));
       });
-    }, [30, 10, 10, 10, 10, 12, 10, 10, 10, 10]);
+    }, [30, 13, 10, 10, 11, 11, 11, 11, 11, 10, 10]);
   }
-  // Toute l'école : une page de synthèse (une ligne par classe et par période), avant les feuilles des classes
+  // Toute l'école : d'abord l'école entière (toutes classes réunies), puis un bloc par classe ; le détail est dans les onglets suivants
   function feuilleSynthese(XLSX, blocs, annee) {
+    const ecole = [];
+    ["1er semestre", "2nd semestre", "Annuel"].forEach((periode) => {
+      const pes = blocs.map((b) => b.periodes.find((pe) => pe.periode === periode)).filter(Boolean);
+      if (pes.length) ecole.push(...statsParSexe(annee, "École", periode, pes.flatMap((pe) => pe.entrees), pes.reduce((a, pe) => a + pe.effectif, 0)));
+    });
+    const tous = blocs.reduce((a, b) => ({ F: a.F + b.sexes.F, M: a.M + b.sexes.M, autre: a.autre + b.sexes.autre }), { F: 0, M: 0, autre: 0 });
     return feuilleExcel(XLSX, (f) => {
       f.bandeau(ECOLE_XL, STY_XL.ecole);
       f.bandeau("Synthèse de l'école — année scolaire " + annee + " — détail de chaque classe dans les onglets suivants", STY_XL.titre);
       f.vide();
+      f.bandeau("ÉCOLE ENTIÈRE — " + blocs.length + " classe(s), " + (tous.F + tous.M + tous.autre) + " élèves : " + compoSexes(tous), STY_XL.section);
+      f.tableau(ENTETES_STATS_XL, lignesStatsXl(ecole));
+      f.ligne([{ v: NOTE_STATS_XL, s: STY_XL.note }]);
+      f.vide();
       blocs.forEach((bloc) => {
-        f.bandeau(bloc.classe + " (" + bloc.resultats.length + " élève" + (bloc.resultats.length > 1 ? "s" : "") + ")", STY_XL.section);
-        f.tableau(["Période", "Effectif", "Élèves classés", "Taux de réussite (%)", "Moyenne de la classe", "Plus forte", "Plus faible"],
-          bloc.stats.map((x) => [{ v: x["Période"], s: STY_XL.texte }, xlNb(x["Effectif"]), xlNb(x["Élèves classés"]), xlNb(x["Taux de réussite (%)"], "0.0"),
-            xlNb(x["Moyenne de la classe"], "0.000"), xlNb(x["Plus forte"], "0.000"), xlNb(x["Plus faible"], "0.000")]));
+        f.bandeau(bloc.classe + " — " + bloc.resultats.length + " élève" + (bloc.resultats.length > 1 ? "s" : "") + " : " + compoSexes(bloc.sexes), STY_XL.section);
+        f.tableau(ENTETES_STATS_XL, lignesStatsXl(bloc.stats));
         f.vide();
       });
-    }, [18, 10, 12, 14, 14, 11, 11]);
+    }, [16, 13, 10, 10, 11, 11, 11, 11, 11, 10, 10]);
   }
+
   function telechargerFichier(nom, contenu, type) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([contenu], { type }));
@@ -2518,9 +2552,26 @@
     return "﻿" + [colonnes.join(";")].concat(lignes.map((l) => colonnes.map((c) => cellule(l[c])).join(";"))).join("\r\n");
   }
   const arrondi = (v, d) => present(v) ? Math.round(v * Math.pow(10, d)) / Math.pow(10, d) : undefined;
-  const COLS_RESULTATS = ["Année", "Classe", "Élève", "Moyenne S1", "Rang S1", "Moyenne S2", "Rang S2", "Moyenne annuelle", "Rang annuel", "Statut annuel"];
+  const COLS_RESULTATS = ["Année", "Classe", "Élève", "Sexe", "Moyenne S1", "Rang S1", "Moyenne S2", "Rang S2", "Moyenne annuelle", "Rang annuel", "Statut annuel"];
   const COLS_NOTES = ["Année", "Classe", "Élève", "Semestre", "Matière", "Coef", "Interro 1", "Interro 2", "Interro 3", "Moy. interros", "Devoir 1", "Devoir 2", "Moyenne /20", "Points"];
-  const COLS_STATS = ["Année", "Classe", "Période", "Effectif", "Élèves classés", "Taux de réussite (%)", "Moyenne de la classe", "Plus forte", "Plus faible"];
+  const COLS_STATS = ["Année", "Classe", "Période", "Groupe", "Effectif", "Élèves classés", "Ayant la moyenne", "% ayant la moyenne", "N'ayant pas la moyenne", "% n'ayant pas la moyenne", "Moyenne du groupe", "Plus forte", "Plus faible"];
+  // Statistiques d'une période, filles / garçons / total : nombre et pourcentage d'élèves ayant (≥ 10) ou n'ayant pas la moyenne.
+  // Les pourcentages sont calculés sur les élèves classés (ceux qui ont une moyenne).
+  function statsParSexe(annee, classe, periode, entrees, effectifTotal) {
+    const groupes = [["Filles", entrees.filter((x) => x.sexe === "F")], ["Garçons", entrees.filter((x) => x.sexe === "M")]];
+    const inconnus = entrees.filter((x) => !SEXES[x.sexe]);
+    if (inconnus.length) groupes.push(["Non renseigné", inconnus]);
+    groupes.push(["Total", entrees, effectifTotal]);
+    return groupes.map(([groupe, liste, eff]) => {
+      const moys = liste.map((x) => x.moyenne).filter(present);
+      const oui = moys.filter((m) => m >= 10).length, non = moys.length - oui;
+      const pc = (n) => moys.length ? arrondi((n * 100) / moys.length, 1) : undefined;
+      return { "Année": annee, "Classe": classe, "Période": periode, "Groupe": groupe, "Effectif": eff ?? liste.length, "Élèves classés": moys.length,
+        "Ayant la moyenne": oui, "% ayant la moyenne": pc(oui), "N'ayant pas la moyenne": non, "% n'ayant pas la moyenne": pc(non),
+        "Moyenne du groupe": moys.length ? arrondi(moys.reduce((a, b) => a + b, 0) / moys.length, 3) : undefined,
+        "Plus forte": moys.length ? arrondi(Math.max(...moys), 3) : undefined, "Plus faible": moys.length ? arrondi(Math.min(...moys), 3) : undefined };
+    });
+  }
 
   const majLibelleExport = () => { $("export-classe-nom").textContent = $("ar-classe").value || "choisie"; };
   $("ar-classe").addEventListener("change", majLibelleExport);
@@ -2539,7 +2590,7 @@
       for (const classe of (ecole ? ORDRE_CLASSES : [classeChoisie])) {
         const docs = await Promise.all(["_S1", "_S2", "_ANNUEL"].map((suf) => lireStats(doc(db, "statistiques_classe", classe + "_" + annee + suf))));
         if (!docs.some((d) => d.exists())) continue;
-        const bloc = { classe, resultats: [], stats: [], notes: [] };
+        const bloc = { classe, resultats: [], stats: [], notes: [], periodes: [] };
         blocs.push(bloc);
         showStatus("status-archives", "Préparation du fichier : " + classe + "…", true);
         const eleves = new Map();   // uid → { nom, p0: S1, p1: S2, p2: annuel }
@@ -2551,18 +2602,28 @@
           classement.forEach((x) => {
             if (x.rang) nbParRang[i][x.rang] = (nbParRang[i][x.rang] || 0) + 1;
             if (!x.uid) return;
-            const e = eleves.get(x.uid) || { nom: x.nom };
+            const e = eleves.get(x.uid) || { nom: x.nom, sexe: null };
             e["p" + i] = x;
+            if (SEXES[x.sexe] && !e.sexe) e.sexe = x.sexe;
             eleves.set(x.uid, e);
           });
-          const moys = classement.map((x) => x.moyenne).filter(present);
-          bloc.stats.push({ "Année": annee, "Classe": classe, "Période": periode, "Effectif": d.effectif ?? classement.length, "Élèves classés": moys.length,
-            "Taux de réussite (%)": d.taux_reussite, "Moyenne de la classe": moys.length ? arrondi(moys.reduce((a, b) => a + b, 0) / moys.length, 3) : undefined,
-            "Plus forte": moys.length ? arrondi(Math.max(...moys), 3) : undefined, "Plus faible": moys.length ? arrondi(Math.min(...moys), 3) : undefined });
+          bloc.periodes.push({ periode, classement, effectif: d.effectif ?? classement.length });
         });
-        stats.push(...bloc.stats);
         const rangDe = (e) => (e.p2 && e.p2.rang) || (e.p1 && e.p1.rang) || (e.p0 && e.p0.rang) || 9999;
         const liste = Array.from(eleves.entries()).sort((a, b) => rangDe(a[1]) - rangDe(b[1]) || a[1].nom.localeCompare(b[1].nom, "fr"));
+        // Sexe : celui recopié dans le classement à la clôture, sinon la fiche de l'élève (classes clôturées avant l'ajout du sexe)
+        const sansSexe = liste.filter(([, e]) => !e.sexe).map(([uid]) => uid);
+        for (let i = 0; i < sansSexe.length; i += 20) {
+          const fiches = await Promise.all(sansSexe.slice(i, i + 20).map((u) => lire(doc(db, "utilisateurs", u)).catch(() => null)));
+          fiches.forEach((f, k) => { const sx = f && f.exists() ? f.data().sexe : null; if (SEXES[sx]) eleves.get(sansSexe[i + k]).sexe = sx; });
+        }
+        bloc.periodes.forEach((pe) => {
+          pe.entrees = pe.classement.map((x) => ({ moyenne: x.moyenne, sexe: (x.uid && eleves.has(x.uid) && eleves.get(x.uid).sexe) || null }));
+          bloc.stats.push(...statsParSexe(annee, classe, pe.periode, pe.entrees, pe.effectif));
+        });
+        bloc.sexes = { F: 0, M: 0, autre: 0 };
+        liste.forEach(([, e]) => { bloc.sexes[SEXES[e.sexe] ? e.sexe : "autre"]++; });
+        stats.push(...bloc.stats);
         // Notes détaillées : mêmes calculs que sur le bulletin (lignesBulletin)
         const taches = [];
         liste.forEach(([uid, e]) => [1, 2].forEach((sem) => taches.push({ uid, nom: e.nom, sem })));
@@ -2577,7 +2638,7 @@
         const rangXl = (i, x) => x && x.rang ? rangTexte(x.rang) + (nbParRang[i][x.rang] > 1 ? " ex aequo" : "") : undefined;
         const s1HorsClassement = {};
         lus.forEach(([t, snap]) => { if (t.sem === 1 && snap.exists() && snap.data().hors_classement && present(snap.data().moyenne_generale)) s1HorsClassement[t.uid] = snap.data().moyenne_generale; });
-        liste.forEach(([uid, e]) => bloc.resultats.push({ "Année": annee, "Classe": classe, "Élève": e.nom,
+        liste.forEach(([uid, e]) => bloc.resultats.push({ "Année": annee, "Classe": classe, "Élève": e.nom, "Sexe": e.sexe || undefined,
           "Moyenne S1": arrondi(e.p0 ? e.p0.moyenne : s1HorsClassement[uid], 3), "Rang S1": e.p0 ? rangXl(0, e.p0) : (uid in s1HorsClassement ? "Non classé" : undefined),
           "Moyenne S2": arrondi(e.p1 && e.p1.moyenne, 3), "Rang S2": rangXl(1, e.p1),
           "Moyenne annuelle": arrondi(e.p2 && e.p2.moyenne, 3), "Rang annuel": rangXl(2, e.p2),
@@ -2646,16 +2707,17 @@
     const jeton = ++jetonArchive;
     feuille.innerHTML = "<div class='squelette' aria-label='Chargement'><span></span><span></span><span></span><span></span></div>";
     try {
-      const [b1, b2, bA] = await Promise.all([
+      const [b1, b2, bA, fiche] = await Promise.all([
         lire(doc(db, "bulletins", idBulletinPour(uid, 1, annee))),
         lire(doc(db, "bulletins", idBulletinPour(uid, 2, annee))),
-        lire(doc(db, "bulletins", uid + "_" + annee + "_ANNUEL"))
+        lire(doc(db, "bulletins", uid + "_" + annee + "_ANNUEL")),
+        lire(doc(db, "utilisateurs", uid)).catch(() => null)   // pour le sexe
       ]);
       const d1 = b1.exists() ? b1.data() : null, d2 = b2.exists() ? b2.data() : null, dAn = bA.exists() ? bA.data() : null;
       const classeAnnee = (d1 && d1.classe) || (d2 && d2.classe) || (dAn && dAn.classe) || classe;
       const st = await lireStats(doc(db, "statistiques_classe", idStatsPour(classeAnnee, semArchive, annee)));
       if (jeton !== jetonArchive) return;
-      $("vb-sous-titre").textContent = "Classe de " + classeAnnee + ", année " + annee;
+      $("vb-sous-titre").textContent = "Classe de " + classeAnnee + ", année " + annee + texteSexe(fiche && fiche.exists() ? fiche.data().sexe : null);
       const data = semArchive === 1 ? d1 : d2;
       feuille.innerHTML = data
         ? construireFeuille(data, classeAnnee, semArchive, st.exists() ? st.data() : null, semArchive === 2 ? dAn : null)
@@ -2724,7 +2786,7 @@
     const eleve = document.body.dataset.ecran === "eleve";
     if (!archive && !eleve) return;
     const nom = $(archive ? "vb-nom" : "eleve-titre").textContent.trim();
-    const classeAnnee = $(archive ? "vb-sous-titre" : "eleve-sous-titre").textContent.replace("Classe de ", "").replace(", année", "").trim();
+    const classeAnnee = $(archive ? "vb-sous-titre" : "eleve-sous-titre").textContent.split(" · ")[0].replace("Classe de ", "").replace(", année", "").trim();
     const bouton = document.querySelector(archive ? "[data-arsem].active" : "[data-esem].active");
     const libSem = bouton && (bouton.dataset.arsem || bouton.dataset.esem) === "2" ? "2nd semestre" : "1er semestre";
     document.querySelector(".entete-impression .ei-doc").textContent = "Bulletin de notes, " + libSem;
@@ -2877,7 +2939,7 @@
         if (jeton !== jetonRendu) return;
         // Classe de l'élève CETTE année-là (et non sa classe actuelle)
         const classeAnnee = (d1 && d1.classe) || (d2 && d2.classe) || (dAn && dAn.classe) || classeActuelle;
-        $("eleve-sous-titre").textContent = "Classe de " + classeAnnee + ", année " + anneeAffichee;
+        $("eleve-sous-titre").textContent = "Classe de " + classeAnnee + ", année " + anneeAffichee + texteSexe(profil && profil.sexe);
 
         const cleCl = anneeAffichee + "|" + classeAnnee;
         if (!classements[cleCl]) classements[cleCl] = Promise.all([
