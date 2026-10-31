@@ -2386,17 +2386,118 @@
 
 
   // ---- Export Excel des archives ----
-  // La bibliothèque SheetJS n'est chargée qu'au moment du téléchargement (aucun poids en plus pour le site)
-  const URL_XLSX = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-  function chargerXLSX() {
-    if (window.XLSX) return Promise.resolve(window.XLSX);
+  // La bibliothèque Excel n'est chargée qu'au moment du téléchargement (aucun poids en plus pour le site).
+  // 1er choix : SheetJS avec mise en forme (couleurs, bordures) ; secours : SheetJS simple (même contenu, sans couleurs).
+  const URLS_XLSX = ["https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js", "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"];
+  function chargerScript(url) {
     return new Promise((resolve, reject) => {
       const sc = document.createElement("script");
-      sc.src = URL_XLSX;
-      sc.onload = () => window.XLSX ? resolve(window.XLSX) : reject(new Error("XLSX absent"));
+      sc.src = url;
+      sc.onload = resolve;
       sc.onerror = () => { sc.remove(); reject(new Error("Chargement impossible")); };
       document.head.appendChild(sc);
     });
+  }
+  async function chargerXLSX() {
+    for (const url of URLS_XLSX) {
+      if (window.XLSX) break;
+      try { await chargerScript(url); } catch (e) { console.warn("Excel :", url, e); }
+    }
+    if (!window.XLSX) throw new Error("XLSX absent");
+    return window.XLSX;
+  }
+  // ---- Mise en page du fichier Excel : une feuille par classe, des blocs bien séparés ----
+  const STY_XL = (() => {
+    const trait = { style: "thin", color: { rgb: "B7C9BD" } };
+    const cadre = { top: trait, bottom: trait, left: trait, right: trait };
+    const centre = { horizontal: "center", vertical: "center" };
+    return {
+      ecole: { font: { bold: true, sz: 15, color: { rgb: "1F4D3A" } } },
+      titre: { font: { bold: true, sz: 12, color: { rgb: "4A5C52" } } },
+      section: { font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "2E6B4F" } }, alignment: { vertical: "center" } },
+      entete: { font: { bold: true, color: { rgb: "1F4D3A" } }, fill: { fgColor: { rgb: "DCEBE1" } }, border: cadre, alignment: { ...centre, wrapText: true } },
+      groupe: { font: { bold: true, color: { rgb: "1F4D3A" } }, fill: { fgColor: { rgb: "F1F6F2" } }, border: cadre },
+      texte: { border: cadre },
+      nombre: { border: cadre, alignment: centre },
+      admis: { border: cadre, alignment: centre, font: { bold: true, color: { rgb: "1E7B45" } } },
+      refus: { border: cadre, alignment: centre, font: { bold: true, color: { rgb: "C42B2B" } } },
+    };
+  })();
+  // Fabrique une feuille ligne par ligne (cellules { v, s, z }) ; une cellule vide garde son cadre
+  function feuilleExcel(XLSX, remplir, largeurs) {
+    const ws = {}, fusions = [];
+    let r = 0;
+    const f = {
+      ligne(cellules) {
+        cellules.forEach((c, i) => {
+          const o = c !== null && typeof c === "object" ? c : { v: c };
+          const vide = o.v === undefined || o.v === null || o.v === "";
+          if (vide && !o.s) return;
+          // Copie du style pour chaque cellule : la bibliothèque y range le format des nombres (sinon il déteint sur les autres cellules)
+          const st = o.s ? Object.assign({}, o.s, o.z ? { numFmt: o.z } : null) : undefined;
+          ws[XLSX.utils.encode_cell({ r, c: i })] = vide ? { t: "s", v: "", s: st } : { t: typeof o.v === "number" ? "n" : "s", v: o.v, s: st, z: o.z };
+        });
+        r++;
+      },
+      bandeau(texte, style, nb = largeurs.length) {   // titre sur toute la largeur du tableau
+        fusions.push({ s: { r, c: 0 }, e: { r, c: nb - 1 } });
+        f.ligne([{ v: texte, s: style }].concat(Array.from({ length: nb - 1 }, () => ({ v: "", s: style }))));
+      },
+      tableau(entetes, lignes) {
+        f.ligne(entetes.map((t) => ({ v: t, s: STY_XL.entete })));
+        lignes.forEach((l) => f.ligne(l));
+      },
+      vide(n = 1) { r += n; },
+    };
+    remplir(f);
+    ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(r - 1, 0), c: largeurs.length - 1 } });
+    ws["!merges"] = fusions;
+    ws["!cols"] = largeurs.map((w) => ({ wch: w }));
+    return ws;
+  }
+  const nomFeuille = (t) => String(t).replace(/[:\\/?*\[\]]/g, "-").slice(0, 31);
+  const xlNb = (v, z) => ({ v: v === undefined ? "" : v, s: STY_XL.nombre, z: typeof v === "number" ? z : undefined });
+  const ECOLE_XL = "Complexe Moderne des Collines (CMC) — Savè";
+  function feuilleClasse(XLSX, bloc, annee) {
+    return feuilleExcel(XLSX, (f) => {
+      f.bandeau(ECOLE_XL, STY_XL.ecole);
+      f.bandeau("Classe de " + bloc.classe + " — année scolaire " + annee + " — " + bloc.resultats.length + " élève(s)", STY_XL.titre);
+      f.vide();
+      f.bandeau("RÉSULTATS DE LA CLASSE", STY_XL.section);
+      f.tableau(["Élève", "Moy. S1", "Rang S1", "Moy. S2", "Rang S2", "Moy. annuelle", "Rang annuel", "Décision"],
+        bloc.resultats.map((x) => [{ v: x["Élève"], s: STY_XL.texte }, xlNb(x["Moyenne S1"], "0.000"), xlNb(x["Rang S1"]), xlNb(x["Moyenne S2"], "0.000"), xlNb(x["Rang S2"]),
+          xlNb(x["Moyenne annuelle"], "0.000"), xlNb(x["Rang annuel"]),
+          { v: x["Statut annuel"] || "", s: x["Statut annuel"] === "Admis" ? STY_XL.admis : x["Statut annuel"] ? STY_XL.refus : STY_XL.nombre }]));
+      f.vide();
+      f.bandeau("STATISTIQUES", STY_XL.section);
+      f.tableau(["Période", "Effectif", "Élèves classés", "Taux de réussite (%)", "Moyenne de la classe", "Plus forte", "Plus faible"],
+        bloc.stats.map((x) => [{ v: x["Période"], s: STY_XL.texte }, xlNb(x["Effectif"]), xlNb(x["Élèves classés"]), xlNb(x["Taux de réussite (%)"], "0.0"),
+          xlNb(x["Moyenne de la classe"], "0.000"), xlNb(x["Plus forte"], "0.000"), xlNb(x["Plus faible"], "0.000")]));
+      f.vide();
+      f.bandeau("NOTES DÉTAILLÉES (par élève)", STY_XL.section);
+      bloc.notes.forEach((b) => {
+        f.vide();
+        f.bandeau(b.nom + " — " + (b.sem === 1 ? "1er" : "2nd") + " semestre" + (b.classe !== bloc.classe ? " (en " + b.classe + ")" : ""), STY_XL.groupe);
+        f.tableau(["Matière", "Coef", "Interro 1", "Interro 2", "Interro 3", "Moy. interros", "Devoir 1", "Devoir 2", "Moy. /20", "Points"],
+          b.lignes.map((l) => [{ v: l["Matière"], s: STY_XL.texte }, xlNb(l["Coef"]), xlNb(l["Interro 1"], "0.00"), xlNb(l["Interro 2"], "0.00"), xlNb(l["Interro 3"], "0.00"),
+            xlNb(l["Moy. interros"], "0.00"), xlNb(l["Devoir 1"], "0.00"), xlNb(l["Devoir 2"], "0.00"), xlNb(l["Moyenne /20"], "0.00"), xlNb(l["Points"], "0.00")]));
+      });
+    }, [30, 10, 10, 10, 10, 12, 10, 10, 10, 10]);
+  }
+  // Toute l'école : une page de synthèse (une ligne par classe et par période), avant les feuilles des classes
+  function feuilleSynthese(XLSX, blocs, annee) {
+    return feuilleExcel(XLSX, (f) => {
+      f.bandeau(ECOLE_XL, STY_XL.ecole);
+      f.bandeau("Synthèse de l'école — année scolaire " + annee + " — détail de chaque classe dans les onglets suivants", STY_XL.titre);
+      f.vide();
+      blocs.forEach((bloc) => {
+        f.bandeau(bloc.classe + " (" + bloc.resultats.length + " élève" + (bloc.resultats.length > 1 ? "s" : "") + ")", STY_XL.section);
+        f.tableau(["Période", "Effectif", "Élèves classés", "Taux de réussite (%)", "Moyenne de la classe", "Plus forte", "Plus faible"],
+          bloc.stats.map((x) => [{ v: x["Période"], s: STY_XL.texte }, xlNb(x["Effectif"]), xlNb(x["Élèves classés"]), xlNb(x["Taux de réussite (%)"], "0.0"),
+            xlNb(x["Moyenne de la classe"], "0.000"), xlNb(x["Plus forte"], "0.000"), xlNb(x["Plus faible"], "0.000")]));
+        f.vide();
+      });
+    }, [18, 10, 12, 14, 14, 11, 11]);
   }
   function telechargerFichier(nom, contenu, type) {
     const a = document.createElement("a");
@@ -2433,27 +2534,33 @@
     cacherStatus("status-archives");
     if (!annee || (!ecole && !classeChoisie)) { showStatus("status-archives", "Choisissez l'année et la classe.", false); return; }
     const resultats = [], notes = [], stats = [];
+    const blocs = [];   // une entrée par classe : ses résultats, statistiques et notes (une feuille Excel chacune)
     try {
       for (const classe of (ecole ? ORDRE_CLASSES : [classeChoisie])) {
         const docs = await Promise.all(["_S1", "_S2", "_ANNUEL"].map((suf) => lireStats(doc(db, "statistiques_classe", classe + "_" + annee + suf))));
         if (!docs.some((d) => d.exists())) continue;
+        const bloc = { classe, resultats: [], stats: [], notes: [] };
+        blocs.push(bloc);
         showStatus("status-archives", "Préparation du fichier : " + classe + "…", true);
         const eleves = new Map();   // uid → { nom, p0: S1, p1: S2, p2: annuel }
+        const nbParRang = [{}, {}, {}];   // par période : combien d'élèves partagent chaque rang (ex aequo)
         ["1er semestre", "2nd semestre", "Annuel"].forEach((periode, i) => {
           if (!docs[i].exists()) return;
           const d = docs[i].data();
           const classement = d.classement || [];
           classement.forEach((x) => {
+            if (x.rang) nbParRang[i][x.rang] = (nbParRang[i][x.rang] || 0) + 1;
             if (!x.uid) return;
             const e = eleves.get(x.uid) || { nom: x.nom };
             e["p" + i] = x;
             eleves.set(x.uid, e);
           });
           const moys = classement.map((x) => x.moyenne).filter(present);
-          stats.push({ "Année": annee, "Classe": classe, "Période": periode, "Effectif": d.effectif ?? classement.length, "Élèves classés": moys.length,
+          bloc.stats.push({ "Année": annee, "Classe": classe, "Période": periode, "Effectif": d.effectif ?? classement.length, "Élèves classés": moys.length,
             "Taux de réussite (%)": d.taux_reussite, "Moyenne de la classe": moys.length ? arrondi(moys.reduce((a, b) => a + b, 0) / moys.length, 3) : undefined,
             "Plus forte": moys.length ? arrondi(Math.max(...moys), 3) : undefined, "Plus faible": moys.length ? arrondi(Math.min(...moys), 3) : undefined });
         });
+        stats.push(...bloc.stats);
         const rangDe = (e) => (e.p2 && e.p2.rang) || (e.p1 && e.p1.rang) || (e.p0 && e.p0.rang) || 9999;
         const liste = Array.from(eleves.entries()).sort((a, b) => rangDe(a[1]) - rangDe(b[1]) || a[1].nom.localeCompare(b[1].nom, "fr"));
         // Notes détaillées : mêmes calculs que sur le bulletin (lignesBulletin)
@@ -2466,22 +2573,28 @@
           paquet.forEach((t, k) => lus.push([t, snaps[k]]));
         }
         // Élève arrivé après la clôture du 1er semestre : sa moyenne du 1er semestre est sur son bulletin (hors classement)
+        // Rang écrit comme sur le bulletin : 1er, 2e, 3e… (+ « ex aequo » si le rang est partagé)
+        const rangXl = (i, x) => x && x.rang ? rangTexte(x.rang) + (nbParRang[i][x.rang] > 1 ? " ex aequo" : "") : undefined;
         const s1HorsClassement = {};
         lus.forEach(([t, snap]) => { if (t.sem === 1 && snap.exists() && snap.data().hors_classement && present(snap.data().moyenne_generale)) s1HorsClassement[t.uid] = snap.data().moyenne_generale; });
-        liste.forEach(([uid, e]) => resultats.push({ "Année": annee, "Classe": classe, "Élève": e.nom,
-          "Moyenne S1": arrondi(e.p0 ? e.p0.moyenne : s1HorsClassement[uid], 3), "Rang S1": e.p0 ? (e.p0.rang || undefined) : (uid in s1HorsClassement ? "Non classé" : undefined),
-          "Moyenne S2": arrondi(e.p1 && e.p1.moyenne, 3), "Rang S2": (e.p1 && e.p1.rang) || undefined,
-          "Moyenne annuelle": arrondi(e.p2 && e.p2.moyenne, 3), "Rang annuel": (e.p2 && e.p2.rang) || undefined,
+        liste.forEach(([uid, e]) => bloc.resultats.push({ "Année": annee, "Classe": classe, "Élève": e.nom,
+          "Moyenne S1": arrondi(e.p0 ? e.p0.moyenne : s1HorsClassement[uid], 3), "Rang S1": e.p0 ? rangXl(0, e.p0) : (uid in s1HorsClassement ? "Non classé" : undefined),
+          "Moyenne S2": arrondi(e.p1 && e.p1.moyenne, 3), "Rang S2": rangXl(1, e.p1),
+          "Moyenne annuelle": arrondi(e.p2 && e.p2.moyenne, 3), "Rang annuel": rangXl(2, e.p2),
           "Statut annuel": e.p2 ? (e.p2.admis ? "Admis" : "Non admis") : undefined }));
+        resultats.push(...bloc.resultats);
         lus.forEach(([t, snap]) => {
           if (!snap.exists()) return;
           const d = snap.data();
           const cl = d.classe || classe;
-          lignesBulletin(cl, d.notes || {}).lignes.forEach((l) => notes.push({ "Année": annee, "Classe": cl, "Élève": t.nom, "Semestre": t.sem === 1 ? "1er" : "2nd",
+          const groupe = { nom: t.nom, sem: t.sem, classe: cl, lignes: [] };
+          bloc.notes.push(groupe);
+          lignesBulletin(cl, d.notes || {}).lignes.forEach((l) => groupe.lignes.push({ "Année": annee, "Classe": cl, "Élève": t.nom, "Semestre": t.sem === 1 ? "1er" : "2nd",
             "Matière": l.mat, "Coef": l.coef,
             "Interro 1": l.conduite ? undefined : arrondi(l.interros[0], 2), "Interro 2": l.conduite ? undefined : arrondi(l.interros[1], 2),
             "Interro 3": l.conduite ? undefined : arrondi(l.interros[2], 2), "Moy. interros": arrondi(l.moyI, 2),
             "Devoir 1": arrondi(l.d1, 2), "Devoir 2": arrondi(l.d2, 2), "Moyenne /20": arrondi(l.moy, 2), "Points": arrondi(l.points, 2) }));
+          notes.push(...groupe.lignes);
         });
       }
       if (!resultats.length) { showStatus("status-archives", "Aucun résultat clôturé à télécharger pour " + (ecole ? "l'école" : classeChoisie) + " en " + annee + ".", false); return; }
@@ -2491,15 +2604,10 @@
       try { XLSX = await chargerXLSX(); } catch (e) { console.error("SheetJS :", e); }
       if (XLSX) {
         const classeur = XLSX.utils.book_new();
-        [["Résultats", COLS_RESULTATS, resultats, [11, 13, 28]], ["Notes détaillées", COLS_NOTES, notes, [11, 13, 28, 10, 24]], ["Statistiques", COLS_STATS, stats, [11, 13, 14]]]
-          .forEach(([nom, cols, lignes, larges]) => {
-            const feuille = XLSX.utils.json_to_sheet(lignes, { header: cols });
-            feuille["!cols"] = cols.map((c, i) => ({ wch: larges[i] || Math.max(10, c.length + 2) }));
-            feuille["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: lignes.length, c: cols.length - 1 } }) };
-            XLSX.utils.book_append_sheet(classeur, feuille, nom);
-          });
+        if (ecole) XLSX.utils.book_append_sheet(classeur, feuilleSynthese(XLSX, blocs, annee), "Synthèse");
+        blocs.forEach((bloc) => XLSX.utils.book_append_sheet(classeur, feuilleClasse(XLSX, bloc, annee), nomFeuille(bloc.classe)));
         XLSX.writeFile(classeur, base + ".xlsx");
-        showStatus("status-archives", "Fichier « " + base + ".xlsx » téléchargé : " + resultats.length + " élève(s), " + notes.length + " lignes de notes.", true);
+        showStatus("status-archives", "Fichier « " + base + ".xlsx » téléchargé : " + (ecole ? blocs.length + " classe(s), un onglet par classe, " : "") + resultats.length + " élève(s).", true);
       } else {
         telechargerFichier(base + "_resultats.csv", versCSV(COLS_RESULTATS, resultats), "text/csv;charset=utf-8");
         telechargerFichier(base + "_notes.csv", versCSV(COLS_NOTES, notes), "text/csv;charset=utf-8");
