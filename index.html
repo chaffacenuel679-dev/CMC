@@ -599,7 +599,7 @@
   .liste-ligne .actions select { width: auto; min-width: 140px; max-width: 200px; height: 36px; font-size: 14px; border-radius: 8px; }
   @media (max-width: 480px) { .liste-ligne.avec-actions { flex-wrap: wrap; } .liste-ligne.avec-actions .actions { width: 100%; justify-content: flex-start; } }
   .eleve-choix .btn-imprimer { margin: 0 0 16px auto; }
-  .eleve-info { margin: -6px 0 14px; }
+  .eleve-info { margin: -6px 0 14px; background: var(--echec-pale); color: var(--echec); border: 1px solid #E8B4B4; font-weight: 600; }
   .ligne-eleve { padding: 8px 0; }
   .ligne-eleve .actions { flex-wrap: nowrap; flex-shrink: 0; }
   .liste-ligne.avec-formulaire { flex-wrap: wrap; }
@@ -781,7 +781,7 @@
 
       <section id="panel-notes" class="panneau panneau-admin">
         <h2>✍️ Saisir les notes</h2>
-        <p class="intro">Une case vide ne compte jamais comme zéro, si la note que mérite votre élève est "0", veillez entrer 0. Un semestre clôturé est verrouillé et saisir de nouvelles notes ou en modifier est impossible.</p>
+        <p class="intro">Une case vide ne compte jamais comme zéro, si la note que mérite votre élève est "0", veuillez entrer 0. Un semestre clôturé est verrouillé et saisir de nouvelles notes ou en modifier est impossible.</p>
         <div class="grille-form deux">
           <div class="champ"><label for="n-classe">Classe</label><select id="n-classe"><option value="">Choisir une classe</option></select></div>
           <div class="champ"><label for="n-eleve">Élève</label><select id="n-eleve"><option value="">Choisir d'abord une classe</option></select></div>
@@ -904,7 +904,7 @@
       <h1 id="eleve-titre"></h1>
       <p id="eleve-sous-titre"></p>
     </div>
-    <p class="info eleve-info" id="eleve-info" hidden>ℹ️ Vous n'êtes plus inscrit(e) au CMC : vos bulletins restent consultables.</p>
+    <p class="info eleve-info" id="eleve-info" hidden>⚠️ Vous n'êtes plus inscrit(e) au CMC : vos bulletins restent consultables.</p>
     <div class="eleve-choix">
       <div class="champ" id="e-annee-champ"><label for="e-annee-select">📅 Année scolaire</label><select id="e-annee-select"></select></div>
       <div class="segment" role="group" aria-label="Semestre">
@@ -1288,13 +1288,14 @@
   $("btn-deconnexion").addEventListener("click", () => {
     if (!abandonnerSaisie()) return;
     arreterEcouteurs(); session = null;
+    oublierPage();   // la prochaine connexion repart de la première page
     signOut(auth).finally(() => location.reload());
   });
 
   onAuthStateChanged(auth, async (user) => {
     arreterEcouteurs();
     session = null;
-    if (!user) { afficher("login"); return; }
+    if (!user) { oublierPage(); afficher("login"); return; }
     afficher("chargement");
     await suivreAnnee();
     let profil = null;
@@ -1319,6 +1320,18 @@
     }
   });
 
+  // ---- Page en cours : retrouvée après un rafraîchissement (F5) dans le même onglet, oubliée à la déconnexion ----
+  const CLE_PAGE = "cmc_page";
+  function lirePage() {
+    try { const e = JSON.parse(sessionStorage.getItem(CLE_PAGE) || "null"); return e && session && e.uid === session.uid ? e : null; }
+    catch (e) { return null; }
+  }
+  function memoriserPage(maj) {
+    if (!session) return;
+    try { sessionStorage.setItem(CLE_PAGE, JSON.stringify(Object.assign(lirePage() || { uid: session.uid }, maj))); } catch (e) {}
+  }
+  function oublierPage() { try { sessionStorage.removeItem(CLE_PAGE); } catch (e) {} }
+
   // ================= Administration =================
   let elevesParClasse = {};
   let semestreActif = 1;
@@ -1341,6 +1354,7 @@
       tab.setAttribute("aria-current", "page");
       document.querySelectorAll(".panneau-admin").forEach((p) => p.classList.toggle("actif", p.id === "panel-" + tab.dataset.tab));
       tab.scrollIntoView({ block: "nearest", inline: "nearest" });
+      memoriserPage({ onglet: tab.dataset.tab });
       if (tab.dataset.tab === "resume") chargerResume();
       if (tab.dataset.tab === "cloture") afficherEtatCloture();
       if (tab.dataset.tab === "passage") verifierBoutonPassage();
@@ -1362,6 +1376,33 @@
     const aMarquer = snap.docs.filter((d) => !d.data().statut);
     await parPaquets(aMarquer.map((d) => () => updateDoc(doc(db, "utilisateurs", d.id), { statut: "actif" })), 20);
     await setDoc(doc(db, "config", "annee_active"), { migration_statut_actif: true }, { merge: true });
+  }
+
+  // Après un rafraîchissement : même onglet, mêmes choix (notes, gestion, archives) qu'avant
+  let pageAdminRestauree = false;
+  function restaurerPageAdmin() {
+    if (pageAdminRestauree) return;
+    pageAdminRestauree = true;
+    const etat = lirePage();
+    if (!etat) return;
+    const option = (sel, v) => v && Array.from($(sel).options).some((o) => o.value === v);
+    const n = etat.notes;
+    if (n && option("n-classe", n.classe)) {
+      if (n.sem === 1 || n.sem === 2) {
+        semestreActif = n.sem;
+        document.querySelectorAll("#panel-notes [data-sem]").forEach((b) => b.classList.toggle("active", parseInt(b.dataset.sem) === n.sem));
+      }
+      $("n-classe").value = n.classe; $("n-classe").dispatchEvent(new Event("change"));
+      if (option("n-eleve", n.uid)) { $("n-eleve").value = n.uid; $("n-eleve").dispatchEvent(new Event("change")); }
+    }
+    if (option("g-classe", etat.gerer)) { $("g-classe").value = etat.gerer; afficherListeGerer(); }
+    const a = etat.archives;
+    if (a && option("ar-annee", a.annee) && option("ar-classe", a.classe)) {
+      $("ar-annee").value = a.annee; $("ar-classe").value = a.classe; majLibelleExport();
+    }
+    const tab = etat.onglet && document.querySelector(".nav-item[data-tab='" + etat.onglet + "']");
+    if (tab && etat.onglet !== "resume") tab.click();
+    if (a && a.vu && $("ar-annee").value === a.annee && $("ar-classe").value === a.classe) $("btn-voir-archives").click();
   }
 
   async function demarrerAdmin() {
@@ -1387,6 +1428,7 @@
       afficherListeGerer();
       afficherRecherche();
       restaurerChoixCloture();
+      restaurerPageAdmin();
       if (resumeActif()) { if (!resumeCharge) chargerResume(); else rafraichirResume(); }
     }, (err) => console.error("Liste des élèves :", err));
 
@@ -1458,7 +1500,7 @@
   }
 
   // ---- Gérer les élèves ----
-  $("g-classe").addEventListener("change", afficherListeGerer);
+  $("g-classe").addEventListener("change", () => { memoriserPage({ gerer: $("g-classe").value }); afficherListeGerer(); });
   function afficherListeGerer() {
     const classe = $("g-classe").value;
     const zone = $("g-liste");
@@ -1786,11 +1828,13 @@
     if (!classe || !elevesParClasse[classe]) { sel.innerHTML = "<option value=''>Choisir d'abord une classe</option>"; return; }
     sel.innerHTML = "<option value=''>Choisir un élève</option>" +
       elevesParClasse[classe].map((el) => "<option value='" + esc(el.uid) + "'>" + esc(el.nom) + "</option>").join("");
+    memoriserNotes();
     chargerGrille();
   });
+  const memoriserNotes = () => memoriserPage({ notes: { classe: $("n-classe").value, uid: $("n-eleve").value, sem: semestreActif } });
   $("n-eleve").addEventListener("change", async (e) => {
     if (!abandonnerSaisie()) { e.target.value = eleveSelectionne || ""; return; }
-    eleveSelectionne = e.target.value || null; cacherStatus("status-note"); await chargerGrille();
+    eleveSelectionne = e.target.value || null; cacherStatus("status-note"); memoriserNotes(); await chargerGrille();
   });
   document.querySelectorAll("[data-sem]").forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -1798,6 +1842,7 @@
       document.querySelectorAll("[data-sem]").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       semestreActif = parseInt(btn.dataset.sem);
+      memoriserNotes();
       cacherStatus("status-note");
       await chargerGrille();
     });
@@ -2324,6 +2369,7 @@
       const dansS1 = new Set(s1.exists() ? (s1.data().classement || []).map((x) => x.uid) : []);
       const aVerifier = s1.exists() ? Array.from(uids).filter((u) => !dansS1.has(u)).map((u) => "bulletins/" + u + "_" + annee + "_S1") : [];
       derniereArchiveConsultee = { classe, annee, uids: Array.from(uids), chemins, aVerifier };
+      memoriserPage({ archives: { annee, classe, vu: true } });
       // Liste des élèves de cette classe cette année-là, pour consulter leur bulletin
       const noms = new Map();
       [s1, s2, an].forEach((s) => { if (s.exists()) (s.data().classement || []).forEach((x) => { if (x.uid && !noms.has(x.uid)) noms.set(x.uid, x.nom); }); });
@@ -2378,6 +2424,7 @@
   const majLibelleExport = () => { $("export-classe-nom").textContent = $("ar-classe").value || "choisie"; };
   $("ar-classe").addEventListener("change", majLibelleExport);
   majLibelleExport();
+  ["ar-annee", "ar-classe"].forEach((id) => $(id).addEventListener("change", () => memoriserPage({ archives: { annee: $("ar-annee").value, classe: $("ar-classe").value, vu: false } })));
   $("btn-exporter").addEventListener("click", (ev) => exporterArchives(ev.currentTarget, false));
   $("btn-exporter-ecole").addEventListener("click", (ev) => exporterArchives(ev.currentTarget, true));
   function exporterArchives(bouton, ecole) { return occupe(bouton, async () => {
@@ -2652,7 +2699,7 @@
     $("btn-imprimer").hidden = !ok;
     document.body.dataset.impression = ok ? "oui" : "non";
   }
-  let jetonRendu = 0;
+  let jetonRendu = 0, pageEleveRestauree = false;
   async function afficherBulletinEleve(uid, nom, classeActuelle) {
     $("eleve-titre").textContent = nom || "";
     $("eleve-sous-titre").textContent = "";
@@ -2680,6 +2727,10 @@
       return;
     }
     let anneeAffichee = actif ? ANNEE_SCOLAIRE : annees[0];
+    // Après un rafraîchissement (F5) : même année et même semestre qu'avant (une seule fois par chargement)
+    const memoire = !pageEleveRestauree && lirePage();
+    pageEleveRestauree = true;
+    if (memoire && memoire.eleve && annees.includes(memoire.eleve.annee)) anneeAffichee = memoire.eleve.annee;
     sel.value = anneeAffichee;
 
     // Onglet le plus utile : le 2nd semestre dès qu'il a commencé (ou que l'année est terminée), sinon le 1er
@@ -2687,12 +2738,13 @@
       const c = parAnnee && parAnnee[annee];
       return c && (c.ANNUEL || (c.S2 && (!c.S1 || c.S1.cloture === true))) ? 2 : 1;
     };
-    let semEleve = ongletUtile(anneeAffichee);
+    let semEleve = memoire && memoire.eleve && memoire.eleve.annee === anneeAffichee && (memoire.eleve.sem === 1 || memoire.eleve.sem === 2) ? memoire.eleve.sem : ongletUtile(anneeAffichee);
+    const memoriserEleve = () => memoriserPage({ eleve: { annee: anneeAffichee, sem: semEleve } });
     const marquerOnglet = () => document.querySelectorAll("[data-esem]").forEach((b) => b.classList.toggle("active", parseInt(b.dataset.esem) === semEleve));
     marquerOnglet();
-    sel.onchange = () => { anneeAffichee = sel.value; semEleve = ongletUtile(anneeAffichee); marquerOnglet(); render(); };
+    sel.onchange = () => { anneeAffichee = sel.value; semEleve = ongletUtile(anneeAffichee); memoriserEleve(); marquerOnglet(); render(); };
     document.querySelectorAll("[data-esem]").forEach((btn) => {
-      btn.onclick = () => { semEleve = parseInt(btn.dataset.esem); marquerOnglet(); render(); };
+      btn.onclick = () => { semEleve = parseInt(btn.dataset.esem); memoriserEleve(); marquerOnglet(); render(); };
     });
     const classements = {};   // classements déjà lus, par année et classe (changer d'onglet ne relit rien)
 
