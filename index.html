@@ -290,7 +290,6 @@
   @media (max-width: 480px) { .liste-ligne select { max-width: 52%; } }
   .vide { padding: 18px; border: 1.5px dashed var(--trait); border-radius: 12px; color: var(--encre-2); text-align: center; font-size: 14px; }
   .export-boite { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
-  .export-titre { font-size: 14px; font-weight: 700; margin-right: 4px; }
   .ar-bulletins { margin-top: 22px; padding-top: 18px; border-top: 1.5px dashed var(--trait); }
   .ar-bulletins h3 { margin-top: 0 !important; }
   .ar-aide { margin: -4px 0 12px; font-size: 14px; color: var(--encre-2); }
@@ -846,9 +845,7 @@
         </div>
         <button class="btn" id="btn-voir-archives" type="button">Afficher les résultats</button>
         <div class="export-boite">
-          <span class="export-titre">⬇️ Excel :</span>
-          <button class="btn contour petit" id="btn-exporter" type="button" title="Télécharger la classe choisie en Excel"><b id="export-classe-nom">choisie</b></button>
-          <button class="btn contour petit" id="btn-exporter-ecole" type="button">Toute l'école</button>
+          <button class="btn contour petit" id="btn-exporter" type="button" title="Télécharger les résultats de la classe choisie en Excel">⬇️ Excel : <b id="export-classe-nom">choisie</b></button>
         </div>
         <div class="statut" id="status-archives" role="status"></div>
         <div id="ar-bulletins" class="ar-bulletins" hidden>
@@ -2509,29 +2506,6 @@
       });
     }, [30, 13, 10, 10, 11, 11, 11, 11, 11, 10, 10]);
   }
-  // Toute l'école : d'abord l'école entière (toutes classes réunies), puis un bloc par classe ; le détail est dans les onglets suivants
-  function feuilleSynthese(XLSX, blocs, annee) {
-    const ecole = [];
-    ["1er semestre", "2nd semestre", "Annuel"].forEach((periode) => {
-      const pes = blocs.map((b) => b.periodes.find((pe) => pe.periode === periode)).filter(Boolean);
-      if (pes.length) ecole.push(...statsParSexe(annee, "École", periode, pes.flatMap((pe) => pe.entrees), pes.reduce((a, pe) => a + pe.effectif, 0)));
-    });
-    const tous = blocs.reduce((a, b) => ({ F: a.F + b.sexes.F, M: a.M + b.sexes.M, autre: a.autre + b.sexes.autre }), { F: 0, M: 0, autre: 0 });
-    return feuilleExcel(XLSX, (f) => {
-      f.bandeau(ECOLE_XL, STY_XL.ecole);
-      f.bandeau("Synthèse de l'école — année scolaire " + annee + " — détail de chaque classe dans les onglets suivants", STY_XL.titre);
-      f.vide();
-      f.bandeau("ÉCOLE ENTIÈRE — " + blocs.length + " classe(s), " + (tous.F + tous.M + tous.autre) + " élèves : " + compoSexes(tous), STY_XL.section);
-      f.tableau(ENTETES_STATS_XL, lignesStatsXl(ecole));
-      f.ligne([{ v: NOTE_STATS_XL, s: STY_XL.note }]);
-      f.vide();
-      blocs.forEach((bloc) => {
-        f.bandeau(bloc.classe + " — " + bloc.resultats.length + " élève" + (bloc.resultats.length > 1 ? "s" : "") + " : " + compoSexes(bloc.sexes), STY_XL.section);
-        f.tableau(ENTETES_STATS_XL, lignesStatsXl(bloc.stats));
-        f.vide();
-      });
-    }, [16, 13, 10, 10, 11, 11, 11, 11, 11, 10, 10]);
-  }
 
   function telechargerFichier(nom, contenu, type) {
     const a = document.createElement("a");
@@ -2577,17 +2551,16 @@
   $("ar-classe").addEventListener("change", majLibelleExport);
   majLibelleExport();
   ["ar-annee", "ar-classe"].forEach((id) => $(id).addEventListener("change", () => memoriserPage({ archives: { annee: $("ar-annee").value, classe: $("ar-classe").value, vu: false } })));
-  $("btn-exporter").addEventListener("click", (ev) => exporterArchives(ev.currentTarget, false));
-  $("btn-exporter-ecole").addEventListener("click", (ev) => exporterArchives(ev.currentTarget, true));
-  function exporterArchives(bouton, ecole) { return occupe(bouton, async () => {
+  $("btn-exporter").addEventListener("click", (ev) => exporterArchives(ev.currentTarget));
+  function exporterArchives(bouton) { return occupe(bouton, async () => {
     const annee = $("ar-annee").value;
     const classeChoisie = $("ar-classe").value;
     cacherStatus("status-archives");
-    if (!annee || (!ecole && !classeChoisie)) { showStatus("status-archives", "Choisissez l'année et la classe.", false); return; }
+    if (!annee || !classeChoisie) { showStatus("status-archives", "Choisissez l'année et la classe.", false); return; }
     const resultats = [], notes = [], stats = [];
     const blocs = [];   // une entrée par classe : ses résultats, statistiques et notes (une feuille Excel chacune)
     try {
-      for (const classe of (ecole ? ORDRE_CLASSES : [classeChoisie])) {
+      for (const classe of [classeChoisie]) {
         const docs = await Promise.all(["_S1", "_S2", "_ANNUEL"].map((suf) => lireStats(doc(db, "statistiques_classe", classe + "_" + annee + suf))));
         if (!docs.some((d) => d.exists())) continue;
         const bloc = { classe, resultats: [], stats: [], notes: [], periodes: [] };
@@ -2658,17 +2631,16 @@
           notes.push(...groupe.lignes);
         });
       }
-      if (!resultats.length) { showStatus("status-archives", "Aucun résultat clôturé à télécharger pour " + (ecole ? "l'école" : classeChoisie) + " en " + annee + ".", false); return; }
+      if (!resultats.length) { showStatus("status-archives", "Aucun résultat clôturé à télécharger pour " + classeChoisie + " en " + annee + ".", false); return; }
       // Nom de fichier sans accent ni espace (certains navigateurs refusent les accents)
-      const base = ("CMC_resultats_" + annee + "_" + (ecole ? "ecole" : classeChoisie)).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9_.-]+/g, "-");
+      const base = ("CMC_resultats_" + annee + "_" + classeChoisie).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9_.-]+/g, "-");
       let XLSX = null;
       try { XLSX = await chargerXLSX(); } catch (e) { console.error("SheetJS :", e); }
       if (XLSX) {
         const classeur = XLSX.utils.book_new();
-        if (ecole) XLSX.utils.book_append_sheet(classeur, feuilleSynthese(XLSX, blocs, annee), "Synthèse");
         blocs.forEach((bloc) => XLSX.utils.book_append_sheet(classeur, feuilleClasse(XLSX, bloc, annee), nomFeuille(bloc.classe)));
         XLSX.writeFile(classeur, base + ".xlsx");
-        showStatus("status-archives", "Fichier « " + base + ".xlsx » téléchargé : " + (ecole ? blocs.length + " classe(s), un onglet par classe, " : "") + resultats.length + " élève(s).", true);
+        showStatus("status-archives", "Fichier « " + base + ".xlsx » téléchargé : " + resultats.length + " élève(s).", true);
       } else {
         telechargerFichier(base + "_resultats.csv", versCSV(COLS_RESULTATS, resultats), "text/csv;charset=utf-8");
         telechargerFichier(base + "_notes.csv", versCSV(COLS_NOTES, notes), "text/csv;charset=utf-8");
