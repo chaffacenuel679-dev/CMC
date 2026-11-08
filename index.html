@@ -1460,7 +1460,8 @@
     try {
       await creerCompteSansDeconnecter(email, password, (uid) => setDoc(doc(db, "utilisateurs", uid), { nom, sexe, role: "eleve", classe, eleve_id: uid, email, statut: "actif" }));
       showStatus("status-eleve", "Compte créé pour " + nom + " (" + classe + ", sexe " + sexe + "). À remettre à la famille : identifiant « " + email + " », mot de passe « " + password + " ».", true);
-      $("e-nom").value = ""; $("e-sexe").value = ""; $("e-email").value = ""; $("e-password").value = "";   // sexe à choisir à chaque élève
+      // Formulaire remis à zéro : sexe et classe à choisir à nouveau pour chaque élève (pas de report par erreur)
+      $("e-nom").value = ""; $("e-sexe").value = ""; $("e-classe").value = ""; $("e-email").value = ""; $("e-password").value = "";
       $("e-nom").focus();
     } catch (e) { showStatus("status-eleve", messageErreur(e), false); }
   }));
@@ -2426,6 +2427,9 @@
       groupe: { font: { bold: true, color: { rgb: "1F4D3A" } }, fill: { fgColor: { rgb: "F1F6F2" } }, border: cadre },
       texte: { border: cadre },
       nombre: { border: cadre, alignment: centre },
+      rouge: { border: cadre, alignment: centre, font: { color: { rgb: "C42B2B" } } },   // moyenne sous 10
+      totalRouge: { border: cadre, alignment: centre, font: { bold: true, color: { rgb: "C42B2B" } }, fill: { fgColor: { rgb: "F1F6F2" } } },
+      periode: { font: { bold: true, color: { rgb: "1F4D3A" } }, fill: { fgColor: { rgb: "EEF4EF" } }, border: cadre },
       admis: { border: cadre, alignment: centre, font: { bold: true, color: { rgb: "1E7B45" } } },
       refus: { border: cadre, alignment: centre, font: { bold: true, color: { rgb: "C42B2B" } } },
       totalTexte: { border: cadre, font: { bold: true }, fill: { fgColor: { rgb: "F1F6F2" } } },
@@ -2435,7 +2439,7 @@
   })();
   // Fabrique une feuille ligne par ligne (cellules { v, s, z }) ; une cellule vide garde son cadre
   function feuilleExcel(XLSX, remplir, largeurs) {
-    const ws = {}, fusions = [];
+    const ws = {}, fusions = [], hauteurs = [], sauts = [];
     let r = 0;
     const f = {
       ligne(cellules) {
@@ -2449,64 +2453,116 @@
         });
         r++;
       },
-      bandeau(texte, style, nb = largeurs.length) {   // titre sur toute la largeur du tableau
+      bandeau(texte, style, nb = largeurs.length, hauteur) {   // titre sur toute la largeur du tableau
         fusions.push({ s: { r, c: 0 }, e: { r, c: nb - 1 } });
+        if (hauteur) hauteurs[r] = { hpt: hauteur };
         f.ligne([{ v: texte, s: style }].concat(Array.from({ length: nb - 1 }, () => ({ v: "", s: style }))));
       },
       tableau(entetes, lignes) {
+        if (entetes.some((t) => t.length > 9)) hauteurs[r] = { hpt: 30 };   // en-têtes sur deux lignes
         f.ligne(entetes.map((t) => ({ v: t, s: STY_XL.entete })));
         lignes.forEach((l) => f.ligne(l));
       },
       vide(n = 1) { r += n; },
+      saut() { sauts.push(r); },   // saut de page à l'impression avant la ligne suivante
     };
     remplir(f);
     ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(r - 1, 0), c: largeurs.length - 1 } });
     ws["!merges"] = fusions;
+    ws["!rows"] = hauteurs;
+    ws["!sauts"] = sauts;   // lu par fichierImprimable (ignoré par la bibliothèque)
     ws["!cols"] = largeurs.map((w) => ({ wch: w }));
     return ws;
   }
   const nomFeuille = (t) => String(t).replace(/[:\\/?*\[\]]/g, "-").slice(0, 31);
   const xlNb = (v, z) => ({ v: v === undefined ? "" : v, s: STY_XL.nombre, z: typeof v === "number" ? z : undefined });
   const ECOLE_XL = "Complexe Moderne des Collines (CMC) — Savè";
-  // Tableau des statistiques par sexe (une ligne Filles / Garçons / Total par période ; Total en gras)
-  const ENTETES_STATS_XL = ["Période", "Groupe", "Effectif", "Élèves classés", "Ayant la moyenne", "% ayant la moyenne", "N'ayant pas la moyenne", "% n'ayant pas la moyenne", "Moyenne du groupe", "Plus forte", "Plus faible"];
-  function lignesStatsXl(stats) {
-    return stats.map((x) => {
+  // Moyenne : rouge si elle est sous 10 (comme sur le site), en gras sur une ligne de total
+  const xlMoy = (v, z, total) => {
+    const c = xlNb(v, z);
+    if (typeof v === "number" && v < 10) c.s = total ? STY_XL.totalRouge : STY_XL.rouge;
+    else if (total) c.s = STY_XL.totalNombre;
+    return c;
+  };
+  // Statistiques par sexe : une ligne-titre par période, puis Filles / Garçons / Total (Total en gras)
+  const ENTETES_STATS_XL = ["Groupe", "Effectif", "Élèves classés", "Ayant la moyenne", "% ayant la moyenne", "N'ayant pas la moyenne", "% n'ayant pas la moyenne", "Moyenne du groupe", "Plus forte", "Plus faible"];
+  function tableauStatsXl(f, stats) {
+    f.tableau(ENTETES_STATS_XL, []);
+    let periode = null;
+    stats.forEach((x) => {
+      if (x["Période"] !== periode) { periode = x["Période"]; f.bandeau(periode, STY_XL.periode, ENTETES_STATS_XL.length); }
       const total = x["Groupe"] === "Total";
       const n = (v, z) => { const c = xlNb(v, z); if (total) c.s = STY_XL.totalNombre; return c; };
-      return [{ v: x["Période"], s: total ? STY_XL.totalTexte : STY_XL.texte }, { v: x["Groupe"], s: total ? STY_XL.totalTexte : STY_XL.texte },
-        n(x["Effectif"]), n(x["Élèves classés"]), n(x["Ayant la moyenne"]), n(x["% ayant la moyenne"], "0.0"), n(x["N'ayant pas la moyenne"]), n(x["% n'ayant pas la moyenne"], "0.0"),
-        n(x["Moyenne du groupe"], "0.000"), n(x["Plus forte"], "0.000"), n(x["Plus faible"], "0.000")];
+      const pc = (v) => n(typeof v === "number" ? Math.round(v * 10) / 1000 : v, "0.0%");   // vrai pourcentage Excel : 66,7 %
+      f.ligne([{ v: x["Groupe"], s: total ? STY_XL.totalTexte : STY_XL.texte }, n(x["Effectif"]), n(x["Élèves classés"]),
+        n(x["Ayant la moyenne"]), pc(x["% ayant la moyenne"]), n(x["N'ayant pas la moyenne"]), pc(x["% n'ayant pas la moyenne"]),
+        xlMoy(x["Moyenne du groupe"], "0.000", total), xlMoy(x["Plus forte"], "0.000", total), xlMoy(x["Plus faible"], "0.000", total)]);
     });
   }
-  const NOTE_STATS_XL = "Avoir la moyenne : 10/20 ou plus. Pourcentages calculés sur les élèves classés. Au résultat annuel, « ayant la moyenne » = admis.";
+  const NOTE_STATS_XL = "Avoir la moyenne : 10/20 ou plus. Pourcentages calculés sur les élèves classés. Au résultat annuel, « ayant la moyenne » = admis. Moyennes sous 10 en rouge.";
   const compoSexes = (sx) => [sx.F ? sx.F + " fille" + (sx.F > 1 ? "s" : "") : "", sx.M ? sx.M + " garçon" + (sx.M > 1 ? "s" : "") : "", sx.autre ? sx.autre + " sexe non renseigné" : ""].filter(Boolean).join(", ");
   function feuilleClasse(XLSX, bloc, annee) {
+    const parUid = new Map(bloc.resultats.map((x) => [x._uid, x]));
+    // Notes détaillées par ordre alphabétique (pour retrouver vite un élève), 1er puis 2nd semestre
+    const notesTriees = bloc.notes.slice().sort((a, b) => a.nom.localeCompare(b.nom, "fr") || a.sem - b.sem);
     return feuilleExcel(XLSX, (f) => {
       f.bandeau(ECOLE_XL, STY_XL.ecole);
       f.bandeau("Classe de " + bloc.classe + " — année scolaire " + annee + " — " + bloc.resultats.length + " élève(s) : " + compoSexes(bloc.sexes), STY_XL.titre);
+      f.ligne([{ v: "Fichier créé le " + new Date().toLocaleDateString("fr-FR") + " depuis le portail des résultats. Élèves classés par rang annuel (sinon du dernier semestre).", s: STY_XL.note }]);
       f.vide();
-      f.bandeau("RÉSULTATS DE LA CLASSE", STY_XL.section);
+      f.bandeau("RÉSULTATS DE LA CLASSE", STY_XL.section, undefined, 20);
       f.tableau(["Élève", "Sexe", "Moy. S1", "Rang S1", "Moy. S2", "Rang S2", "Moy. annuelle", "Rang annuel", "Décision"],
-        bloc.resultats.map((x) => [{ v: x["Élève"], s: STY_XL.texte }, xlNb(x["Sexe"]), xlNb(x["Moyenne S1"], "0.000"), xlNb(x["Rang S1"]), xlNb(x["Moyenne S2"], "0.000"), xlNb(x["Rang S2"]),
-          xlNb(x["Moyenne annuelle"], "0.000"), xlNb(x["Rang annuel"]),
+        bloc.resultats.map((x) => [{ v: x["Élève"], s: STY_XL.texte }, xlNb(x["Sexe"]), xlMoy(x["Moyenne S1"], "0.000"), xlNb(x["Rang S1"]), xlMoy(x["Moyenne S2"], "0.000"), xlNb(x["Rang S2"]),
+          xlMoy(x["Moyenne annuelle"], "0.000"), xlNb(x["Rang annuel"]),
           { v: x["Statut annuel"] || "", s: x["Statut annuel"] === "Admis" ? STY_XL.admis : x["Statut annuel"] ? STY_XL.refus : STY_XL.nombre }]));
       f.vide();
-      f.bandeau("STATISTIQUES (FILLES / GARÇONS)", STY_XL.section);
-      f.tableau(ENTETES_STATS_XL, lignesStatsXl(bloc.stats));
+      f.bandeau("STATISTIQUES (FILLES / GARÇONS)", STY_XL.section, undefined, 20);
+      tableauStatsXl(f, bloc.stats);
       f.ligne([{ v: NOTE_STATS_XL, s: STY_XL.note }]);
-      f.vide();
-      f.bandeau("NOTES DÉTAILLÉES (par élève)", STY_XL.section);
-      bloc.notes.forEach((b) => {
-        f.vide();
+      f.saut();   // à l'impression : les notes détaillées commencent sur une nouvelle page…
+      f.bandeau("NOTES DÉTAILLÉES (élèves par ordre alphabétique)", STY_XL.section, undefined, 20);
+      notesTriees.forEach((b, i) => {
+        if (i > 0 && b.nom !== notesTriees[i - 1].nom) f.saut();   // …puis une page par élève (ses deux semestres)
+        else f.vide();
         f.bandeau(b.nom + " — " + (b.sem === 1 ? "1er" : "2nd") + " semestre" + (b.classe !== bloc.classe ? " (en " + b.classe + ")" : ""), STY_XL.groupe);
         f.tableau(["Matière", "Coef", "Interro 1", "Interro 2", "Interro 3", "Moy. interros", "Devoir 1", "Devoir 2", "Moy. /20", "Points"],
           b.lignes.map((l) => [{ v: l["Matière"], s: STY_XL.texte }, xlNb(l["Coef"]), xlNb(l["Interro 1"], "0.00"), xlNb(l["Interro 2"], "0.00"), xlNb(l["Interro 3"], "0.00"),
-            xlNb(l["Moy. interros"], "0.00"), xlNb(l["Devoir 1"], "0.00"), xlNb(l["Devoir 2"], "0.00"), xlNb(l["Moyenne /20"], "0.00"), xlNb(l["Points"], "0.00")]));
+            xlMoy(l["Moy. interros"], "0.00"), xlNb(l["Devoir 1"], "0.00"), xlNb(l["Devoir 2"], "0.00"), xlMoy(l["Moyenne /20"], "0.00"), xlNb(l["Points"], "0.00")]));
+        // Ligne de total : coefficients et points des matières notées, moyenne et rang du semestre (comme sur le bulletin)
+        const notees = b.lignes.filter((l) => typeof l["Moyenne /20"] === "number");
+        const res = parUid.get(b.uid) || {};
+        const moy = res[b.sem === 1 ? "Moyenne S1" : "Moyenne S2"], rang = res[b.sem === 1 ? "Rang S1" : "Rang S2"];
+        const t = (v, z) => { const c = xlNb(v, z); c.s = STY_XL.totalNombre; return c; };
+        f.ligne([{ v: "Total" + (rang ? " — rang : " + rang : ""), s: STY_XL.totalTexte }, t(notees.reduce((a, l) => a + l["Coef"], 0)),
+          t(""), t(""), t(""), t(""), t(""), { v: "Moyenne", s: STY_XL.totalNombre }, xlMoy(moy, "0.000", true), t(arrondi(notees.reduce((a, l) => a + (l["Points"] || 0), 0), 2), "0.00")]);
       });
-    }, [30, 13, 10, 10, 11, 11, 11, 11, 11, 10, 10]);
+    }, [30, 10, 10, 11, 11, 11, 11, 11, 10, 10]);
   }
 
+  // Mise en page d'impression, que la bibliothèque n'écrit pas : A4 paysage, ajusté à la largeur d'une page,
+  // centré, sauts de page (une page par élève dans les notes détaillées), « Page 1 / 6 » en bas.
+  // On retouche le XML de la feuille dans le fichier compressé ; en cas de souci, le fichier est téléchargé sans ces réglages.
+  function fichierImprimable(XLSX, classeur, pied) {
+    try {
+      const zip = XLSX.CFB.read(new Uint8Array(XLSX.write(classeur, { type: "array", bookType: "xlsx" })), { type: "array" });
+      const ent = XLSX.CFB.find(zip, "/xl/worksheets/sheet1.xml");
+      if (!ent || !ent.content) return null;
+      let xml = new TextDecoder().decode(new Uint8Array(ent.content));
+      if (/<sheetPr|<pageSetup/.test(xml)) return null;   // format inattendu : on ne touche à rien
+      const xmlEsc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const sauts = (classeur.Sheets[classeur.SheetNames[0]]["!sauts"] || []).filter((r) => r > 0);
+      const mise = '<printOptions horizontalCentered="1"/>' +
+        '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.6" header="0.3" footer="0.3"/>' +
+        '<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>' +
+        "<headerFooter><oddFooter>&amp;L" + xmlEsc(pied.replace(/&/g, "&&")) + "&amp;RPage &amp;P / &amp;N</oddFooter></headerFooter>" +
+        (sauts.length ? '<rowBreaks count="' + sauts.length + '" manualBreakCount="' + sauts.length + '">' + sauts.map((r) => '<brk id="' + r + '" max="16383" man="1"/>').join("") + "</rowBreaks>" : "");
+      xml = xml.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
+      xml = xml.includes("<ignoredErrors") ? xml.replace("<ignoredErrors", mise + "<ignoredErrors") : xml.replace("</worksheet>", mise + "</worksheet>");
+      ent.content = new TextEncoder().encode(xml);
+      ent.size = ent.content.length;
+      return new Uint8Array(XLSX.CFB.write(zip, { type: "array", fileType: "zip" }));
+    } catch (e) { console.warn("Mise en page d'impression :", e); return null; }
+  }
   function telechargerFichier(nom, contenu, type) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([contenu], { type }));
@@ -2611,7 +2667,7 @@
         const rangXl = (i, x) => x && x.rang ? rangTexte(x.rang) + (nbParRang[i][x.rang] > 1 ? " ex aequo" : "") : undefined;
         const s1HorsClassement = {};
         lus.forEach(([t, snap]) => { if (t.sem === 1 && snap.exists() && snap.data().hors_classement && present(snap.data().moyenne_generale)) s1HorsClassement[t.uid] = snap.data().moyenne_generale; });
-        liste.forEach(([uid, e]) => bloc.resultats.push({ "Année": annee, "Classe": classe, "Élève": e.nom, "Sexe": e.sexe || undefined,
+        liste.forEach(([uid, e]) => bloc.resultats.push({ _uid: uid, "Année": annee, "Classe": classe, "Élève": e.nom, "Sexe": e.sexe || undefined,
           "Moyenne S1": arrondi(e.p0 ? e.p0.moyenne : s1HorsClassement[uid], 3), "Rang S1": e.p0 ? rangXl(0, e.p0) : (uid in s1HorsClassement ? "Non classé" : undefined),
           "Moyenne S2": arrondi(e.p1 && e.p1.moyenne, 3), "Rang S2": rangXl(1, e.p1),
           "Moyenne annuelle": arrondi(e.p2 && e.p2.moyenne, 3), "Rang annuel": rangXl(2, e.p2),
@@ -2621,7 +2677,7 @@
           if (!snap.exists()) return;
           const d = snap.data();
           const cl = d.classe || classe;
-          const groupe = { nom: t.nom, sem: t.sem, classe: cl, lignes: [] };
+          const groupe = { uid: t.uid, nom: t.nom, sem: t.sem, classe: cl, lignes: [] };
           bloc.notes.push(groupe);
           lignesBulletin(cl, d.notes || {}).lignes.forEach((l) => groupe.lignes.push({ "Année": annee, "Classe": cl, "Élève": t.nom, "Semestre": t.sem === 1 ? "1er" : "2nd",
             "Matière": l.mat, "Coef": l.coef,
@@ -2639,7 +2695,9 @@
       if (XLSX) {
         const classeur = XLSX.utils.book_new();
         blocs.forEach((bloc) => XLSX.utils.book_append_sheet(classeur, feuilleClasse(XLSX, bloc, annee), nomFeuille(bloc.classe)));
-        XLSX.writeFile(classeur, base + ".xlsx");
+        const imprimable = fichierImprimable(XLSX, classeur, "CMC — " + classeChoisie + " — " + annee);
+        if (imprimable) telechargerFichier(base + ".xlsx", imprimable, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        else XLSX.writeFile(classeur, base + ".xlsx");
         showStatus("status-archives", "Fichier « " + base + ".xlsx » téléchargé : " + resultats.length + " élève(s).", true);
       } else {
         telechargerFichier(base + "_resultats.csv", versCSV(COLS_RESULTATS, resultats), "text/csv;charset=utf-8");
