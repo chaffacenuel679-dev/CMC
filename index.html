@@ -1060,7 +1060,8 @@
     }
     return d[a.length][b.length];
   }
-  // Renvoie un message d'erreur, ou null si l'adresse est correcte (l'adresse doit déjà être en minuscules)
+  // Renvoie un message d'erreur, ou null si l'adresse est correcte (l'adresse doit déjà être en minuscules).
+  // Les fautes de frappe probables (gmial.com…) ne sont PAS des erreurs : voir suggestionEmail.
   function verifierEmail(email) {
     const exemple = " Exemple : prenom.nom@cmc.bj";
     if (!email) return "Saisissez l'adresse e-mail.";
@@ -1078,18 +1079,29 @@
     if (!labels.every((l) => RE_LABEL.test(l))) return "La partie après le « @ » est mal formée (point en trop, tiret au mauvais endroit ou caractère interdit)." + exemple;
     const tld = labels[labels.length - 1];
     if (!RE_TLD.test(tld)) return "L'extension « ." + tld + " » n'est pas valide : elle doit contenir au moins 2 lettres (par exemple .bj, .com ou .fr).";
-    // Fautes de frappe sur les grands fournisseurs : gmial.com, gmail.co, yaho.fr…
-    if (labels.length === 2 && !DOMAINES_REELS.includes(domaine)) {
-      const nom = labels[0];
-      for (const f in FOURNISSEURS) {
-        const ok = FOURNISSEURS[f];
-        if (nom === f ? !ok.includes(tld) : distance(nom, f) <= (f.length >= 6 ? 2 : 1)) {
-          const ext = ok.includes(tld) ? tld : ok.reduce((m, x) => distance(tld, x) < distance(tld, m) ? x : m);
-          return "Faute de frappe probable : vouliez-vous dire « " + local + "@" + f + "." + ext + " » ?";
-        }
+    return null;
+  }
+  // Faute de frappe probable sur un grand fournisseur (gmial.com, gmail.co, yaho.fr…) : renvoie l'adresse
+  // suggérée, ou null. Ce n'est qu'un avertissement : hotmail.be, yahoo.ca ou mail.bj existent vraiment,
+  // l'administrateur peut donc confirmer l'adresse telle qu'elle est écrite.
+  function suggestionEmail(email) {
+    if (verifierEmail(email)) return null;
+    const [local, domaine] = email.split("@"), labels = domaine.split("."), tld = labels[labels.length - 1];
+    if (labels.length !== 2 || DOMAINES_REELS.includes(domaine)) return null;
+    const nom = labels[0];
+    for (const f in FOURNISSEURS) {
+      const ok = FOURNISSEURS[f];
+      if (nom === f ? !ok.includes(tld) : distance(nom, f) <= (f.length >= 6 ? 2 : 1)) {
+        const ext = ok.includes(tld) ? tld : ok.reduce((m, x) => distance(tld, x) < distance(tld, m) ? x : m);
+        return local + "@" + f + "." + ext;
       }
     }
     return null;
+  }
+  // À la création d'un compte : demande confirmation si l'adresse ressemble à une faute de frappe
+  function emailConfirme(email) {
+    const s = suggestionEmail(email);
+    return !s || confirm("Faute de frappe possible dans l'adresse e-mail :\n\n  saisie : " + email + "\n  vouliez-vous dire : " + s + " ?\n\n« OK » garde l'adresse saisie (" + email + "). « Annuler » pour la corriger.");
   }
   function aideChamp(input, msg) {
     const champ = input.closest(".champ");
@@ -1116,11 +1128,11 @@
     input.addEventListener("blur", () => {
       const v = input.value.trim().toLowerCase();
       const msg = v ? verifierEmail(v) : null;
-      aideChamp(input, msg ? "⚠️ " + msg : "");
+      const sugg = v && !msg ? suggestionEmail(v) : null;
+      aideChamp(input, msg ? "⚠️ " + msg : sugg ? "⚠️ Faute de frappe possible : vouliez-vous dire « " + sugg + " » ? (sinon, gardez l'adresse telle quelle)" : "");
       if (msg) input.setAttribute("aria-invalid", "true"); else input.removeAttribute("aria-invalid");
     });
     input.addEventListener("input", () => {
-      if (!input.getAttribute("aria-invalid")) return;
       input.removeAttribute("aria-invalid");
       const aide = input.closest(".champ").querySelector(".aide-champ");
       if (aide && aide.textContent.startsWith("⚠️")) aideChamp(input, ""); // garde le message « pas d'emoji »
@@ -1199,6 +1211,14 @@
   function idBulletinPour(uid, sem, annee) { return uid + "_" + annee + "_S" + sem; }
   function idStatsPour(classe, sem, annee) { return classe + "_" + annee + "_S" + sem; }
   function idStatsAnnuelPour(classe, annee) { return classe + "_" + annee + "_ANNUEL"; }
+
+  // Un bulletin est rangé par élève et par année (jamais par classe) : il suit l'élève qui change de classe.
+  // - non clôturé : ses notes le suivent, elles comptent dans sa nouvelle classe ;
+  // - clôturé : il reste, pour toujours, celui de la classe où il a été clôturé. On ne le réécrit jamais
+  //   (les règles de sécurité l'interdisent) : dans sa nouvelle classe, l'élève est traité comme un élève
+  //   arrivé après cette clôture.
+  const clotureAilleurs = (d, classe) => !!(d && d.cloture === true && d.classe && d.classe !== classe);
+  const clotureIci = (d, classe) => !!(d && d.cloture === true && !clotureAilleurs(d, classe));
 
   // ================= Calculs =================
   // Moyenne d'une matière : (moyenne des interros remplies) + Devoir 1 + Devoir 2, divisé par le nombre
@@ -1304,9 +1324,20 @@
     if (!user) { oublierPage(); afficher("login"); return; }
     afficher("chargement");
     await suivreAnnee();
-    let profil = null;
-    try { const snap = await getDoc(doc(db, "utilisateurs", user.uid)); profil = snap.exists() ? snap.data() : null; }
-    catch (e) { console.error(e); }
+    // Lecture du profil : 3 essais, pour qu'une connexion instable ne passe pas pour un compte sans profil
+    let profil = null, erreurLecture = null;
+    for (let essai = 0; essai < 3; essai++) {
+      try { const snap = await getDoc(doc(db, "utilisateurs", user.uid)); profil = snap.exists() ? snap.data() : null; erreurLecture = null; break; }
+      catch (e) { console.error("Lecture du profil :", e); erreurLecture = e; await new Promise((r) => setTimeout(r, 1200)); }
+    }
+    if (auth.currentUser !== user) return;   // déconnecté (ou autre compte) pendant l'attente
+    if (erreurLecture) {
+      arreterEcouteurs();
+      await signOut(auth);
+      showStatus("status-login", erreurLecture.code === "permission-denied" ? messageErreur(erreurLecture)
+        : "Connexion internet trop instable : votre profil n'a pas pu être chargé. Votre compte n'est pas en cause : vérifiez le réseau puis reconnectez-vous.", false);
+      return;
+    }
     if (!profil || (profil.role !== "admin" && profil.role !== "eleve")) {
       arreterEcouteurs();
       await signOut(auth);
@@ -1431,6 +1462,7 @@
       const classes = trierClasses(Object.keys(elevesParClasse));
       const lib = (c) => c + " (" + elevesParClasse[c].length + " élève" + (elevesParClasse[c].length > 1 ? "s" : "") + ")";
       ["n-classe", "c-classe", "g-classe"].forEach((id) => remplirSelect($(id), classes, "Choisir une classe", lib));
+      majElevesNotes();
       afficherListeGerer();
       afficherRecherche();
       restaurerChoixCloture();
@@ -1451,6 +1483,7 @@
     if (!nom || !sexe || !classe || !email || !password) { showStatus("status-eleve", "Remplissez les cinq champs (nom, sexe, classe, e-mail, mot de passe).", false); return; }
     const probleme = verifierIdentite(nom, email, password);
     if (probleme) { showStatus("status-eleve", probleme, false); return; }
+    if (!emailConfirme(email)) { showStatus("status-eleve", "Création annulée : corrigez l'adresse e-mail.", false); $("e-email").focus(); return; }
     // Même nom déjà inscrit (doublon par erreur, ou vrai homonyme) : on demande avant de créer
     const cle = (t) => sansAccent(t).replace(/\s+/g, " ").trim();
     const memes = Object.keys(elevesParClasse).filter((c) => elevesParClasse[c].some((el) => cle(el.nom) === cle(nom)));
@@ -1473,6 +1506,7 @@
     if (!nom || !email || !password) { showStatus("status-admin", "Remplissez les trois champs.", false); return; }
     const probleme = verifierIdentite(nom, email, password);
     if (probleme) { showStatus("status-admin", probleme, false); return; }
+    if (!emailConfirme(email)) { showStatus("status-admin", "Création annulée : corrigez l'adresse e-mail.", false); $("a-email").focus(); return; }
     try {
       await creerCompteSansDeconnecter(email, password, (uid) => setDoc(doc(db, "utilisateurs", uid), { nom, role: "admin" }));
       showStatus("status-admin", "Compte administrateur créé pour " + nom + ".", true);
@@ -1538,7 +1572,7 @@
     f.querySelector("[data-valider-classe]").addEventListener("click", (ev) => {
       const nouvelle = f.querySelector("select").value;
       if (nouvelle === ancienne) { f.remove(); ligne.classList.remove("avec-formulaire"); return; }
-      if (!confirm("Déplacer " + el.nom + " de " + ancienne + " en " + nouvelle + " ?\n\nSes notes déjà saisies restent attachées à l'élève ; ce sont les matières de " + nouvelle + " qui comptent.")) return;
+      if (!confirm("Déplacer " + el.nom + " de " + ancienne + " en " + nouvelle + " ?\n\n• Ses notes d'un semestre en cours le suivent : elles compteront en " + nouvelle + " (matières de " + nouvelle + ").\n• Un semestre déjà clôturé en " + ancienne + " reste son résultat officiel : il n'est pas recalculé, et l'élève ne sera pas classé en " + nouvelle + " pour ce semestre-là.")) return;
       occupe(ev.currentTarget, async () => {
         try { await updateDoc(doc(db, "utilisateurs", uid), { classe: nouvelle }); }
         catch (e) { alert(messageErreur(e)); }
@@ -1834,11 +1868,29 @@
     $("grille-container").innerHTML = "";
     cacherStatus("status-note");
     if (!classe || !elevesParClasse[classe]) { sel.innerHTML = "<option value=''>Choisir d'abord une classe</option>"; return; }
-    sel.innerHTML = "<option value=''>Choisir un élève</option>" +
-      elevesParClasse[classe].map((el) => "<option value='" + esc(el.uid) + "'>" + esc(el.nom) + "</option>").join("");
+    sel.innerHTML = optionsElevesNotes(classe);
     memoriserNotes();
     chargerGrille();
   });
+  const optionsElevesNotes = (classe) => "<option value=''>Choisir un élève</option>" +
+    elevesParClasse[classe].map((el) => "<option value='" + esc(el.uid) + "'>" + esc(el.nom) + "</option>").join("");
+  // La liste des élèves a changé (inscription, retrait, changement de classe) : le menu « Élève » de la saisie suit.
+  // L'élève en cours de saisie est gardé s'il est toujours dans la classe ; sinon la grille est fermée.
+  function majElevesNotes() {
+    const classe = $("n-classe").value, sel = $("n-eleve");
+    const fermer = () => { eleveSelectionne = null; grilleModifiee = false; $("grille-container").innerHTML = ""; $("btn-save-grille").disabled = true; };
+    if (!classe || !elevesParClasse[classe]) {
+      if (classeNotes) {
+        const avait = eleveSelectionne;
+        classeNotes = ""; sel.innerHTML = "<option value=''>Choisir d'abord une classe</option>"; fermer();
+        if (avait) showStatus("status-note", "Cet élève n'est plus dans cette classe (retiré ou déplacé).", false);
+      }
+      return;
+    }
+    sel.innerHTML = optionsElevesNotes(classe);
+    if (eleveSelectionne && elevesParClasse[classe].some((el) => el.uid === eleveSelectionne)) sel.value = eleveSelectionne;
+    else if (eleveSelectionne) { fermer(); showStatus("status-note", "Cet élève n'est plus dans cette classe (retiré ou déplacé).", false); }
+  }
   const memoriserNotes = () => memoriserPage({ notes: { classe: $("n-classe").value, uid: $("n-eleve").value, sem: semestreActif } });
   $("n-eleve").addEventListener("change", async (e) => {
     if (!abandonnerSaisie()) { e.target.value = eleveSelectionne || ""; return; }
@@ -1881,19 +1933,19 @@
     try {
       // Le 1er semestre de l'élève est verrouillé, ou bien la classe est clôturée et l'élève est arrivé après
       const s1 = await getDoc(doc(db, "bulletins", idBulletin(eleveSelectionne, 1)));
-      // Un bulletin hérité d'une AUTRE classe (élève déplacé via « changer de classe ») ne compte pas comme
-      // un 1er semestre clôturé ICI : on le traite comme inexistant pour cette classe (grille vierge à nouveau).
-      const d1Valide = s1.exists() && s1.data().classe === classe ? s1.data() : null;
-      const s1Cloture = !!(d1Valide && d1Valide.cloture === true);
+      // Les notes suivent l'élève qui change de classe (bulletin non clôturé d'une autre classe : affiché ici).
+      const d1 = s1.exists() ? s1.data() : null;
+      const s1Cloture = clotureIci(d1, classe);
       if (!s1Cloture) {
         arriveApresS1 = (await lireStats(doc(db, "statistiques_classe", idStats(classe, 1)))).exists();
       }
       if (jeton !== jetonGrille) return;
-      if (semestreActif === 2 && !s1Cloture && !arriveApresS1) { container.innerHTML = refusS2; return; }
-      if (semestreActif === 1) { data = d1Valide || {}; }
+      // Le 2nd semestre s'ouvre quand le 1er est clôturé : pour la classe, ou pour l'élève (même dans son ancienne classe)
+      if (semestreActif === 2 && !s1Cloture && !arriveApresS1 && !clotureAilleurs(d1, classe)) { container.innerHTML = refusS2; return; }
+      if (semestreActif === 1) { data = d1 || {}; }
       else {
         const snap = await getDoc(doc(db, "bulletins", idBulletin(eleveSelectionne, 2)));
-        data = snap.exists() && snap.data().classe === classe ? snap.data() : {};
+        data = snap.exists() ? snap.data() : {};
       }
     }
     catch (e) { if (jeton === jetonGrille) container.innerHTML = "<div class='alerte'>" + esc(messageErreur(e)) + "</div>"; return; }
@@ -1901,13 +1953,22 @@
     const notes = data.notes || {};
     const cloture = data.cloture === true;
     const dis = cloture ? " disabled" : "";
-    let html = cloture ? "<div class='alerte'>🔒 Ce semestre est clôturé pour cet élève : les notes sont verrouillées.</div>" : "";
+    const ailleurs = clotureAilleurs(data, classe);
+    let html = ailleurs
+      ? "<div class='alerte'>🔒 Ce semestre a été clôturé en <b>" + esc(data.classe) + "</b>, l'ancienne classe de cet élève : ces notes sont verrouillées et restent son résultat officiel du semestre" +
+        (present(data.moyenne_generale) ? " (moyenne " + fmt(data.moyenne_generale, 3) + ")" : "") + ". En " + esc(classe) + ", l'élève n'est pas classé à ce semestre.</div>"
+      : cloture ? "<div class='alerte'>🔒 Ce semestre est clôturé pour cet élève : les notes sont verrouillées.</div>" : "";
+    if (!cloture && data.classe && data.classe !== classe) {
+      html += "<p class='info'>ℹ️ Notes saisies quand l'élève était en " + esc(data.classe) + " : elles le suivent et comptent maintenant en " + esc(classe) + " (seules les matières de " + esc(classe) + " sont prises en compte).</p>";
+    }
     if (!cloture && arriveApresS1 && semestreActif === 1) {
       html += "<p class='info'>ℹ️ Arrivé après la clôture : notes facultatives (ancien établissement), comptées dans la moyenne annuelle, sans rang.</p>";
     }
+    const classeGrille = ailleurs && BAREME[data.classe] ? data.classe : classe;
+    const matieresGrille = matieresAcademiques(classeGrille);
     html += "<div class='grille-scroll'><table class='grille'><thead><tr><th>Matières</th>" + EVALS.map((ev) => ev.startsWith("devoir") ? "<th class='th-dev'><span>" + EVAL_LABELS[ev] + "</span></th>" : "<th>" + EVAL_LABELS[ev] + "</th>").join("") + "</tr></thead><tbody>";
-    const bareme = BAREME[classe];
-    matieres.forEach((mat, mi) => {
+    const bareme = BAREME[classeGrille];
+    matieresGrille.forEach((mat, mi) => {
       html += "<tr><td>" + esc(mat) + "<small>coef. " + bareme[mat] + "</small></td>";
       EVALS.forEach((ev) => {
         const v = notes[mat] && present(notes[mat][ev]) ? notes[mat][ev] : "";
@@ -1994,7 +2055,7 @@
   function noteArrivesApresS1(classe, statsS1) {
     const nouveaux = arrivesApresS1(classe, statsS1);
     if (!nouveaux.length) return "";
-    return "<p class='info' style='margin:0 0 14px'>ℹ️ Arrivés après cette clôture, non classés au 1er semestre : <b>" + nouveaux.map((el) => esc(el.nom)).join(", ") + "</b>.</p>";
+    return "<p class='info' style='margin:0 0 14px'>ℹ️ Non classés ici au 1er semestre (arrivés après cette clôture, ou venus d'une autre classe) : <b>" + nouveaux.map((el) => esc(el.nom)).join(", ") + "</b>.</p>";
   }
   async function afficherEtatCloture() {
     const classe = $("c-classe").value;
@@ -2043,8 +2104,9 @@
     if (eleves.length === 0) { showStatus("status-cloture", "Aucun élève actif dans cette classe.", false); return; }
     const libelle = semestreCloture === 1 ? "le 1er semestre" : "le 2nd semestre et le résultat annuel";
     // Confirmation après la lecture des notes : la clôture est définitive, on signale les élèves sans aucune note
-    const confirmer = (sansNote) => {
+    const confirmer = (sansNote, ailleurs = []) => {
       const ok = confirm("Clôturer " + libelle + " de " + classe + " (" + eleves.length + " élèves) ? Les notes seront verrouillées et le classement publié aux familles." +
+        (ailleurs.length ? "\n\nℹ️ " + ailleurs.length + " élève(s) venu(s) d'une autre classe où ce semestre est déjà clôturé : ils gardent ce résultat et ne sont pas classés ici.\n" + ailleurs.join(", ") : "") +
         (sansNote.length ? "\n\n⚠️ " + sansNote.length + " élève(s) sans aucune note " + (semestreCloture === 1 ? "à ce semestre" : "au 2nd semestre") + " : ils ne seront pas classés" + (semestreCloture === 2 ? " et seront « Non admis »" : "") + ".\n" + sansNote.join(", ") : ""));
       if (!ok) cacherStatus("status-cloture");
       return ok;
@@ -2063,33 +2125,35 @@
       lignes.push({ el, data: s.exists() ? s.data() : null });
     }
     const statsExistantes = await lireStats(doc(db, "statistiques_classe", idStats(classe, 1)));
-    if (statsExistantes.exists() && lignes.every((l) => l.data && l.data.cloture === true && l.data.classe === classe)) {
+    if (statsExistantes.exists() && lignes.every((l) => l.data && l.data.cloture === true)) {
       showStatus("status-cloture", "Le 1er semestre de " + classe + " est déjà clôturé.", false);
       $("recap-cloture").innerHTML = construireTableClassement("1er semestre, " + classe, statsExistantes.data(), false);
       return;
     }
-    let liste = lignes.map((l) => {
+    // Élèves venus d'une autre classe où leur 1er semestre est déjà clôturé : ils gardent ce résultat-là
+    // et ne sont pas classés ici (comme un élève arrivé après la clôture).
+    const dejaAilleurs = lignes.filter((l) => clotureAilleurs(l.data, classe));
+    let liste = lignes.filter((l) => !clotureAilleurs(l.data, classe)).map((l) => {
       const moy = moyenneGenerale((l.data && l.data.notes) || {}, bareme);
       return { uid: l.el.uid, nom: l.el.nom, moyenne: moy !== null ? parseFloat(moy.toFixed(3)) : null, data: l.data };
     });
     liste = classerAvecEgalites(liste);
-    if (!confirmer(liste.filter((x) => x.moyenne === null).map((x) => x.nom))) return;
+    if (!confirmer(liste.filter((x) => x.moyenne === null).map((x) => x.nom), dejaAilleurs.map((l) => l.el.nom + " (" + l.data.classe + ")"))) return;
     let n = 0;
     for (const item of liste) {
       n++;
       showStatus("status-cloture", "Clôture en cours… " + n + " / " + liste.length, true);
-      // déjà verrouillé lors d'une clôture interrompue de CETTE classe (un bulletin cloture:true
-      // hérité d'une autre classe, après un changement de classe, est recalculé pour celle-ci)
-      if (item.data && item.data.cloture === true && item.data.classe === classe) continue;
+      // déjà verrouillé lors d'une clôture interrompue de cette classe
+      if (item.data && item.data.cloture === true) continue;
       await setDoc(doc(db, "bulletins", idBulletin(item.uid, 1)), {
         eleve_id: item.uid, classe, semestre: 1, annee_scolaire: ANNEE_SCOLAIRE,
-        notes: (item.data && item.data.notes) || {}, cloture: true, moyenne_generale: item.moyenne, rang: item.rang, effectif: eleves.length
+        notes: (item.data && item.data.notes) || {}, cloture: true, moyenne_generale: item.moyenne, rang: item.rang, effectif: liste.length
       }, { merge: true });
     }
     const taux = tauxReussite(liste);
     const classement = liste.map((x) => avecSexe({ uid: x.uid, nom: x.nom, moyenne: x.moyenne, rang: x.rang }));
     await setDoc(doc(db, "statistiques_classe", idStats(classe, 1)), {
-      classe, semestre: 1, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: taux, classement, eleves_uids: liste.map((x) => x.uid), effectif: eleves.length
+      classe, semestre: 1, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: taux, classement, eleves_uids: liste.map((x) => x.uid), effectif: liste.length
     });
     $("recap-cloture").innerHTML = construireTableClassement("1er semestre, " + classe, { classement, taux_reussite: taux }, false);
     showStatus("status-cloture", "1er semestre clôturé pour " + classe + ". Le classement est visible par les familles.", true);
@@ -2108,34 +2172,37 @@
       lignes.push({ el, d1: s1.exists() ? s1.data() : null, d2: s2.exists() ? s2.data() : null });
     }
     const statsAnnExistantes = await lireStats(doc(db, "statistiques_classe", idStatsAnnuel(classe)));
-    if (statsAnnExistantes.exists() && lignes.every((l) => l.d2 && l.d2.cloture === true && l.d2.classe === classe)) {
+    if (statsAnnExistantes.exists() && lignes.every((l) => l.d2 && l.d2.cloture === true)) {
       showStatus("status-cloture", "Le 2nd semestre de " + classe + " est déjà clôturé.", false);
       const s2 = await lireStats(doc(db, "statistiques_classe", idStats(classe, 2)));
       $("recap-cloture").innerHTML = (s2.exists() ? construireTableClassement("2nd semestre, " + classe, s2.data(), false) : "") +
         construireTableClassement("Résultat annuel, " + classe, statsAnnExistantes.data(), true);
       return;
     }
-    let listeS2 = lignes.map((l) => {
+    // Élèves venus d'une autre classe où leur 2nd semestre (donc leur année) est déjà clôturé : ils gardent
+    // ce résultat annuel-là et n'entrent pas dans les classements d'ici.
+    const dejaAilleurs = lignes.filter((l) => clotureAilleurs(l.d2, classe));
+    let listeS2 = lignes.filter((l) => !clotureAilleurs(l.d2, classe)).map((l) => {
       const moy = moyenneGenerale((l.d2 && l.d2.notes) || {}, bareme);
       return { uid: l.el.uid, nom: l.el.nom, moyenne: moy !== null ? parseFloat(moy.toFixed(3)) : null, d1: l.d1, d2: l.d2 };
     });
     listeS2 = classerAvecEgalites(listeS2);
-    if (!confirmer(listeS2.filter((x) => x.moyenne === null).map((x) => x.nom))) return;
+    if (!confirmer(listeS2.filter((x) => x.moyenne === null).map((x) => x.nom), dejaAilleurs.map((l) => l.el.nom + " (" + l.d2.classe + ")"))) return;
     let listeAnnuel = [];
     let n = 0;
     for (const item of listeS2) {
       n++;
       showStatus("status-cloture", "Clôture en cours… " + n + " / " + listeS2.length, true);
-      if (!(item.d2 && item.d2.cloture === true && item.d2.classe === classe)) {
+      if (!(item.d2 && item.d2.cloture === true)) {
         await setDoc(doc(db, "bulletins", idBulletin(item.uid, 2)), {
           eleve_id: item.uid, classe, semestre: 2, annee_scolaire: ANNEE_SCOLAIRE,
-          notes: (item.d2 && item.d2.notes) || {}, cloture: true, moyenne_generale: item.moyenne, rang: item.rang, effectif: eleves.length
+          notes: (item.d2 && item.d2.notes) || {}, cloture: true, moyenne_generale: item.moyenne, rang: item.rang, effectif: listeS2.length
         });
       }
-      // Un S1 clôturé sous une AUTRE classe (élève déplacé depuis) ne compte pas comme classé ici :
-      // même traitement qu'un élève arrivé après la clôture du 1er semestre de cette classe.
-      let moyS1 = item.d1 && item.d1.cloture === true && item.d1.classe === classe ? item.d1.moyenne_generale : null;
-      if (!(item.d1 && item.d1.cloture === true && item.d1.classe === classe)) {
+      // 1er semestre déjà clôturé (ici, ou dans l'ancienne classe de l'élève) : c'est sa moyenne officielle,
+      // elle entre telle quelle dans la moyenne annuelle et le bulletin n'est pas réécrit.
+      let moyS1 = item.d1 && item.d1.cloture === true ? item.d1.moyenne_generale : null;
+      if (!(item.d1 && item.d1.cloture === true)) {
         // Arrivé après la clôture du 1er semestre : ses éventuelles notes du 1er semestre sont
         // verrouillées maintenant, hors classement (le classement publié du 1er semestre ne change pas).
         const m = moyenneGenerale((item.d1 && item.d1.notes) || {}, bareme);
@@ -2156,7 +2223,7 @@
     for (const item of listeAnnuel) {
       await setDoc(doc(db, "bulletins", idBulletinAnnuel(item.uid)), {
         eleve_id: item.uid, classe, annee_scolaire: ANNEE_SCOLAIRE,
-        moyenne_annuelle: item.moyenne, rang_annuel: item.rang, admis: item.moyenne !== null && item.moyenne >= 10, effectif: eleves.length
+        moyenne_annuelle: item.moyenne, rang_annuel: item.rang, admis: item.moyenne !== null && item.moyenne >= 10, effectif: listeAnnuel.length
       });
     }
     const tauxS2 = tauxReussite(listeS2);
@@ -2165,10 +2232,10 @@
     const classementAnnuel = listeAnnuel.map((x) => avecSexe({ uid: x.uid, nom: x.nom, moyenne: x.moyenne, rang: x.rang, admis: x.moyenne !== null && x.moyenne >= 10 }));
     const uids = listeS2.map((x) => x.uid);
     await setDoc(doc(db, "statistiques_classe", idStats(classe, 2)), {
-      classe, semestre: 2, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: tauxS2, classement: classementS2, eleves_uids: uids, effectif: eleves.length
+      classe, semestre: 2, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: tauxS2, classement: classementS2, eleves_uids: uids, effectif: listeS2.length
     });
     await setDoc(doc(db, "statistiques_classe", idStatsAnnuel(classe)), {
-      classe, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: tauxAnnuel, classement: classementAnnuel, eleves_uids: uids, effectif: eleves.length
+      classe, annee_scolaire: ANNEE_SCOLAIRE, taux_reussite: tauxAnnuel, classement: classementAnnuel, eleves_uids: uids, effectif: listeAnnuel.length
     });
     $("recap-cloture").innerHTML = construireTableClassement("2nd semestre, " + classe, { classement: classementS2, taux_reussite: tauxS2 }, false) +
       construireTableClassement("Résultat annuel, " + classe, { classement: classementAnnuel, taux_reussite: tauxAnnuel }, true);
@@ -2662,11 +2729,12 @@
           const snaps = await Promise.all(paquet.map((t) => lire(doc(db, "bulletins", idBulletinPour(t.uid, t.sem, annee)))));
           paquet.forEach((t, k) => lus.push([t, snaps[k]]));
         }
-        // Élève arrivé après la clôture du 1er semestre : sa moyenne du 1er semestre est sur son bulletin (hors classement)
+        // Élève arrivé après la clôture du 1er semestre, ou venu d'une autre classe où il l'a clôturé :
+        // sa moyenne du 1er semestre est sur son bulletin (non classé dans cette classe)
         // Rang écrit comme sur le bulletin : 1er, 2e, 3e… (+ « ex aequo » si le rang est partagé)
         const rangXl = (i, x) => x && x.rang ? rangTexte(x.rang) + (nbParRang[i][x.rang] > 1 ? " ex aequo" : "") : undefined;
         const s1HorsClassement = {};
-        lus.forEach(([t, snap]) => { if (t.sem === 1 && snap.exists() && snap.data().hors_classement && present(snap.data().moyenne_generale)) s1HorsClassement[t.uid] = snap.data().moyenne_generale; });
+        lus.forEach(([t, snap]) => { if (t.sem === 1 && snap.exists() && (snap.data().hors_classement || clotureAilleurs(snap.data(), classe)) && present(snap.data().moyenne_generale)) s1HorsClassement[t.uid] = snap.data().moyenne_generale; });
         liste.forEach(([uid, e]) => bloc.resultats.push({ _uid: uid, "Année": annee, "Classe": classe, "Élève": e.nom, "Sexe": e.sexe || undefined,
           "Moyenne S1": arrondi(e.p0 ? e.p0.moyenne : s1HorsClassement[uid], 3), "Rang S1": e.p0 ? rangXl(0, e.p0) : (uid in s1HorsClassement ? "Non classé" : undefined),
           "Moyenne S2": arrondi(e.p1 && e.p1.moyenne, 3), "Rang S2": rangXl(1, e.p1),
@@ -2744,7 +2812,7 @@
         lire(doc(db, "utilisateurs", uid)).catch(() => null)   // pour le sexe
       ]);
       const d1 = b1.exists() ? b1.data() : null, d2 = b2.exists() ? b2.data() : null, dAn = bA.exists() ? bA.data() : null;
-      const classeAnnee = (d1 && d1.classe) || (d2 && d2.classe) || (dAn && dAn.classe) || classe;
+      const classeAnnee = classeDuSemestre(semArchive, d1, d2, dAn, annee === ANNEE_SCOLAIRE ? (fiche && fiche.exists() && fiche.data().statut !== "inactif" ? fiche.data().classe : null) : null) || classe;
       const st = await lireStats(doc(db, "statistiques_classe", idStatsPour(classeAnnee, semArchive, annee)));
       if (jeton !== jetonArchive) return;
       $("vb-sous-titre").textContent = "Classe de " + classeAnnee + ", année " + annee + texteSexe(fiche && fiche.exists() ? fiche.data().sexe : null);
@@ -2883,11 +2951,24 @@
     }), 20);
   }
   async function supprimerArchive(id, item) {
-    const taches = [];
-    (item.uids || []).forEach((uid) => ["_S1", "_S2", "_ANNUEL"].forEach((suf) => taches.push(() => deleteDoc(doc(db, "bulletins", uid + "_" + item.annee + suf)).catch(() => {}))));
-    ["_S1", "_S2", "_ANNUEL"].forEach((suf) => taches.push(() => deleteDoc(doc(db, "statistiques_classe", item.classe + "_" + item.annee + suf)).catch(() => {})));
-    // L'année disparaît aussi du menu « Année » des élèves concernés (une seule classe par élève et par année)
-    if (item.annee !== ANNEE_SCOLAIRE) (item.uids || []).forEach((uid) => taches.push(() => updateDoc(doc(db, "utilisateurs", uid), { historique_annees: arrayRemove(item.annee) }).catch(() => {})));
+    // Seuls les bulletins de CETTE classe sont supprimés : un élève qui a changé de classe dans l'année garde
+    // ceux de son autre classe (un bulletin est rangé par élève et par année, il faut donc regarder sa classe).
+    // Un bulletin sans classe (très ancien) est supprimé comme avant. Une erreur interrompt la suppression :
+    // l'archive reste dans la corbeille et la suppression sera retentée.
+    const candidats = [].concat(...(item.uids || []).map((uid) => ["_S1", "_S2", "_ANNUEL"].map((suf) => doc(db, "bulletins", uid + "_" + item.annee + suf))));
+    const taches = [], gardent = new Set();
+    for (let i = 0; i < candidats.length; i += 20) {
+      const snaps = await Promise.all(candidats.slice(i, i + 20).map((r) => getDoc(r)));
+      snaps.forEach((sn, k) => {
+        if (!sn.exists()) return;
+        const d = sn.data();
+        if (d.classe && d.classe !== item.classe) { gardent.add(d.eleve_id || sn.id.split("_")[0]); return; }
+        taches.push(() => deleteDoc(candidats[i + k]));
+      });
+    }
+    ["_S1", "_S2", "_ANNUEL"].forEach((suf) => taches.push(() => deleteDoc(doc(db, "statistiques_classe", item.classe + "_" + item.annee + suf))));
+    // L'année disparaît aussi du menu « Année » des élèves concernés, sauf s'il leur reste un bulletin d'une autre classe
+    if (item.annee !== ANNEE_SCOLAIRE) (item.uids || []).filter((uid) => !gardent.has(uid)).forEach((uid) => taches.push(() => updateDoc(doc(db, "utilisateurs", uid), { historique_annees: arrayRemove(item.annee) }).catch(() => {})));
     await parPaquets(taches, 20);
     await deleteDoc(doc(db, "corbeille", id));   // en dernier : en cas d'erreur avant, la purge sera retentée
   }
@@ -2898,6 +2979,12 @@
   function autoriserImpression(ok) {
     $("btn-imprimer").hidden = !ok;
     document.body.dataset.impression = ok ? "oui" : "non";
+  }
+  // Classe d'un élève pour un semestre d'une année : celle du bulletin de ce semestre ; sinon, pour le 2nd
+  // semestre, celle du résultat annuel puis la classe actuelle (année en cours) ; sinon celle de l'autre semestre.
+  function classeDuSemestre(sem, d1, d2, dAn, classeEnCours) {
+    const c1 = d1 && d1.classe, c2 = (d2 && d2.classe) || (dAn && dAn.classe);
+    return sem === 1 ? (c1 || c2 || classeEnCours) : (c2 || classeEnCours || c1);
   }
   let jetonRendu = 0, pageEleveRestauree = false;
   async function afficherBulletinEleve(uid, nom, classeActuelle) {
@@ -2967,8 +3054,9 @@
           d1 = snapS1.exists() ? snapS1.data() : null; d2 = snapS2.exists() ? snapS2.data() : null; dAn = snapAn.exists() ? snapAn.data() : null;
         }
         if (jeton !== jetonRendu) return;
-        // Classe de l'élève CETTE année-là (et non sa classe actuelle)
-        const classeAnnee = (d1 && d1.classe) || (d2 && d2.classe) || (dAn && dAn.classe) || classeActuelle;
+        // Classe de l'élève CETTE année-là, pour le semestre affiché : un élève qui a changé de classe en cours
+        // d'année voit son 1er semestre dans l'ancienne classe et son 2nd dans la nouvelle.
+        const classeAnnee = classeDuSemestre(semEleve, d1, d2, dAn, anneeAffichee === ANNEE_SCOLAIRE && actif ? (profil && profil.classe) || classeActuelle : null) || classeActuelle;
         $("eleve-sous-titre").textContent = "Classe de " + classeAnnee + ", année " + anneeAffichee + texteSexe(profil && profil.sexe);
 
         const cleCl = anneeAffichee + "|" + classeAnnee;
@@ -3147,6 +3235,8 @@
           "<div><span>📈 Plus forte</span><b class='" + clsNote(Math.max(...moys)) + "'>" + fmt(Math.max(...moys), 3) + "</b></div>" +
           "<div><span>📉 Plus faible</span><b class='" + clsNote(Math.min(...moys)) + "'>" + fmt(Math.min(...moys), 3) + "</b></div></div>";
       }
+    } else if (cloture) {
+      h += "<div class='ligne f-message' style='min-height:96px'><p><b>📭 Aucune note à ce semestre</b>Semestre clôturé sans note : pas de moyenne ni de rang.</p></div>";
     } else {
       h += "<div class='ligne f-message' style='min-height:96px'><p>⏳ La moyenne et le rang seront publiés à la clôture du semestre.</p></div>";
     }
@@ -3159,6 +3249,10 @@
         "<div><span class='lib'>Moyenne annuelle</span><b class='" + (a.moyenne_annuelle >= 10 ? "valeur-ok" : "valeur-ko") + "'>" + fmt(a.moyenne_annuelle, 3) + "</b></div>" +
         "<div><span class='lib'>Rang annuel</span><b>" + medaille(a.rang_annuel) + (a.rang_annuel ? rangTexte(a.rang_annuel) : "—") + "</b>" + (eff ? " <span class='lib' style='display:inline'>sur " + eff + "</span>" : "") + "</div>" +
         "<span class='badge " + (a.admis ? "ok'>🎉 Admis" : "ko'>Non admis") + "</span></div></div>";
+    } else if (bulletinAnnuel) {
+      // Année clôturée sans aucune note au 2nd semestre : pas de moyenne annuelle, mais la décision est affichée
+      h += "<div class='ligne f-annuel'><div class='annuel-carte'><div><span class='lib'>Moyenne annuelle</span><b>—</b></div>" +
+        "<div><span class='lib'>Rang annuel</span><b>Non classé</b></div><span class='badge ko'>Non admis</span></div></div>";
     }
     return h;
   }
