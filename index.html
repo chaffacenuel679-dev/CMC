@@ -2423,6 +2423,7 @@
     $("ar-bulletins").hidden = true;
     if (!annee || !classe) { showStatus("status-archives", "Choisissez l'année et la classe.", false); return; }
     try {
+      if (await archiveEnCorbeille(classe, annee, zone)) return;
       const [s1, s2, an] = await Promise.all([
         lireStats(doc(db, "statistiques_classe", classe + "_" + annee + "_S1")),
         lireStats(doc(db, "statistiques_classe", classe + "_" + annee + "_S2")),
@@ -2680,6 +2681,7 @@
     const classeChoisie = $("ar-classe").value;
     cacherStatus("status-archives");
     if (!annee || !classeChoisie) { showStatus("status-archives", "Choisissez l'année et la classe.", false); return; }
+    try { if (await archiveEnCorbeille(classeChoisie, annee)) return; } catch (e) { showStatus("status-archives", messageErreur(e), false); return; }
     const resultats = [], notes = [], stats = [];
     const blocs = [];   // une entrée par classe : ses résultats, statistiques et notes (une feuille Excel chacune)
     try {
@@ -2776,6 +2778,16 @@
     } catch (e) { showStatus("status-archives", messageErreur(e), false); }
   }); }
 
+  // Une archive mise à la corbeille n'est plus consultable ni téléchargeable (il faut d'abord la restaurer)
+  async function archiveEnCorbeille(classe, annee, zone) {
+    const c = await getDoc(doc(db, "corbeille", classe + "_" + annee));
+    if (!c.exists()) return false;
+    const d = c.data(), date = d.expire_le && d.expire_le.toDate ? d.expire_le.toDate().toLocaleDateString("fr-FR") : "?";
+    const msg = "L'archive " + classe + " " + annee + " est dans la corbeille (suppression le " + date + ") : restaurez-la depuis la corbeille, plus bas, pour la consulter.";
+    if (zone) zone.innerHTML = "<div class='vide'>🗑️ " + esc(msg) + "</div>";
+    showStatus("status-archives", msg, false);
+    return true;
+  }
   $("btn-corbeille").addEventListener("click", (ev) => {
     if (!derniereArchiveConsultee) return;
     const { classe, annee, uids, chemins: cheminsVus, aVerifier } = derniereArchiveConsultee;
@@ -2791,6 +2803,7 @@
         await setDoc(doc(db, "corbeille", classe + "_" + annee), { classe, annee, expire_le: dans20jours, uids, chemins, mis_en_corbeille_le: new Date().toISOString() });
         showStatus("status-archives", "Archive mise à la corbeille. Suppression automatique le " + dans20jours.toDate().toLocaleDateString("fr-FR") + ".", true);
         $("btn-corbeille").style.display = "none";
+        $("ar-resultat").innerHTML = ""; $("ar-bulletins").hidden = true; archiveBulletins = null; derniereArchiveConsultee = null;
       } catch (e) { showStatus("status-archives", messageErreur(e), false); }
     });
   });
@@ -2997,7 +3010,8 @@
       const [p, q] = await Promise.all([getDoc(doc(db, "utilisateurs", uid)), getDocs(query(collection(db, "bulletins"), where("eleve_id", "==", uid)))]);
       profil = p.exists() ? p.data() : null;
       parAnnee = {};
-      q.forEach((d) => { const m = d.id.match(/_(\d{4}-\d{4})_(S1|S2|ANNUEL)$/); if (m) (parAnnee[m[1]] = parAnnee[m[1]] || {})[m[2]] = d.data(); });
+      q.forEach((d) => { if (d.data().expire_le) return;   // archive à la corbeille : plus visible
+        const m = d.id.match(/_(\d{4}-\d{4})_(S1|S2|ANNUEL)$/); if (m) (parAnnee[m[1]] = parAnnee[m[1]] || {})[m[2]] = d.data(); });
     } catch (e) { console.error(e); }
     // Un ancien élève (parti ou retiré) ne voit que ses propres années, jamais l'année en cours de son ancienne classe
     const actif = !profil || profil.statut !== "inactif";
