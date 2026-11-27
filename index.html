@@ -1217,6 +1217,8 @@
   // - clôturé : il reste, pour toujours, celui de la classe où il a été clôturé. On ne le réécrit jamais
   //   (les règles de sécurité l'interdisent) : dans sa nouvelle classe, l'élève est traité comme un élève
   //   arrivé après cette clôture.
+  // Bulletin d'une archive mise à la corbeille : traité partout comme absent (jusqu'à sa restauration)
+  const horsCorbeille = (snap) => snap && snap.exists() && !snap.data().expire_le ? snap.data() : null;
   const clotureAilleurs = (d, classe) => !!(d && d.cloture === true && d.classe && d.classe !== classe);
   const clotureIci = (d, classe) => !!(d && d.cloture === true && !clotureAilleurs(d, classe));
 
@@ -2728,7 +2730,8 @@
         const lus = [];
         for (let i = 0; i < taches.length; i += 20) {
           const paquet = taches.slice(i, i + 20);
-          const snaps = await Promise.all(paquet.map((t) => lire(doc(db, "bulletins", idBulletinPour(t.uid, t.sem, annee)))));
+          const snaps = (await Promise.all(paquet.map((t) => lire(doc(db, "bulletins", idBulletinPour(t.uid, t.sem, annee))))))
+            .map((sn) => sn.exists() && sn.data().expire_le ? { exists: () => false, data: () => undefined } : sn);   // bulletin d'une autre archive à la corbeille
           paquet.forEach((t, k) => lus.push([t, snaps[k]]));
         }
         // Élève arrivé après la clôture du 1er semestre, ou venu d'une autre classe où il l'a clôturé :
@@ -2796,7 +2799,8 @@
     occupe(ev.currentTarget, async () => {
       const dans20jours = Timestamp.fromDate(new Date(Date.now() + 20 * 24 * 60 * 60 * 1000));
       try {
-        const existants = await Promise.all(aVerifier.map((c) => getDoc(doc(db, ...c.split("/"))).then((x) => x.exists() ? c : null)));
+        // Seuls les bulletins de CETTE classe : le 1er semestre d'un élève venu d'une autre classe appartient à l'archive de celle-ci
+        const existants = await Promise.all(aVerifier.map((c) => getDoc(doc(db, ...c.split("/"))).then((x) => x.exists() && (!x.data().classe || x.data().classe === classe) ? c : null)));
         const chemins = cheminsVus.concat(existants.filter(Boolean));
         // updateDoc ne marque que des documents existants (setDoc en aurait créé de vides)
         await parPaquets(chemins.map((c) => () => updateDoc(doc(db, ...c.split("/")), { expire_le: dans20jours }).catch((e) => { if (!e || e.code !== "not-found") throw e; })), 20);
@@ -2824,7 +2828,7 @@
         lire(doc(db, "bulletins", uid + "_" + annee + "_ANNUEL")),
         lire(doc(db, "utilisateurs", uid)).catch(() => null)   // pour le sexe
       ]);
-      const d1 = b1.exists() ? b1.data() : null, d2 = b2.exists() ? b2.data() : null, dAn = bA.exists() ? bA.data() : null;
+      const d1 = horsCorbeille(b1), d2 = horsCorbeille(b2), dAn = horsCorbeille(bA);
       const classeAnnee = classeDuSemestre(semArchive, d1, d2, dAn, annee === ANNEE_SCOLAIRE ? (fiche && fiche.exists() && fiche.data().statut !== "inactif" ? fiche.data().classe : null) : null) || classe;
       const st = await lireStats(doc(db, "statistiques_classe", idStatsPour(classeAnnee, semArchive, annee)));
       if (jeton !== jetonArchive) return;
@@ -3065,7 +3069,7 @@
             lire(doc(db, "bulletins", idBulletinPour(uid, 2, anneeAffichee))),
             lire(doc(db, "bulletins", uid + "_" + anneeAffichee + "_ANNUEL"))
           ]);
-          d1 = snapS1.exists() ? snapS1.data() : null; d2 = snapS2.exists() ? snapS2.data() : null; dAn = snapAn.exists() ? snapAn.data() : null;
+          d1 = horsCorbeille(snapS1); d2 = horsCorbeille(snapS2); dAn = horsCorbeille(snapAn);
         }
         if (jeton !== jetonRendu) return;
         // Classe de l'élève CETTE année-là, pour le semestre affiché : un élève qui a changé de classe en cours
